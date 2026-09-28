@@ -4331,3 +4331,28 @@ a.canvas-title:hover {
     display: none;
   }
 }
+
+/* Own dashboard: a clear way to the example, and quick starts on a blank one. */
+.example-button {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.starter-quick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--banner);
+  border: 1px solid var(--banner-border);
+}
+
+.starter-quick span {
+  font-weight: 600;
+  color: var(--text);
+}

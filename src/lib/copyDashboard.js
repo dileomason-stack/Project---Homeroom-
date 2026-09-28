@@ -8,9 +8,9 @@ export const HAS_OWN_KEY = 'dashboard:hasOwn'
 
 // Copies one dashboard (e.g. a tab of Alex's example) into the visitor's own
 // saved dashboards: every card gets a new id, with its place, size, color and
-// settings, and the copy becomes the dashboard that opens next.
-export function copyToOwnDashboards(fromStore, dashboard) {
-  const own = createStore({ prefix: OWN_PREFIX })
+// settings, and the copy becomes the dashboard that opens next. Pass the own
+// store that's on screen as `own` so the new tab shows up right away.
+export function copyToOwnDashboards(fromStore, dashboard, own = createStore({ prefix: OWN_PREFIX })) {
   const layout = fromStore.get(layoutKeyFor(dashboard.id))
   if (!layout) return null
 

@@ -8,8 +8,10 @@ import { layoutKeyFor, useDashboards } from './useDashboards.js'
 import { copyToOwnDashboards, HAS_OWN_KEY, OWN_PREFIX } from './lib/copyDashboard.js'
 import { showToast } from './lib/toast.js'
 
-// "example": Alex's sample dashboard (memory only, resets on reload).
-// "own": the visitor's own dashboard, saved in this browser.
+// "own": the visitor's own dashboard, saved in this browser. It's where
+//   Homeroom opens for first-time visitors.
+// "example": Alex's sample dashboard (memory only, resets on reload), one
+//   click away as a tour of what Homeroom can do.
 const MODE_KEY = 'dashboard:mode'
 
 // Layouts saved by earlier versions of the app.
@@ -23,10 +25,13 @@ function storeFor(mode) {
 
 export default function App() {
   // Each switch creates a fresh store, so the example always starts clean.
-  const [store, setStore] = useState(() => storeFor(readJSON(MODE_KEY, 'example') === 'own' ? 'own' : 'example'))
+  const [store, setStore] = useState(() => {
+    const mode = readJSON(MODE_KEY, 'own') === 'example' ? 'example' : 'own'
+    if (mode === 'own') writeJSON(HAS_OWN_KEY, true)
+    return storeFor(mode)
+  })
   // Bumped on every switch so the dashboard starts fresh (no leftover full-screen widget, etc.).
   const [generation, setGeneration] = useState(0)
-
 
   function switchTo(mode) {
     writeJSON(MODE_KEY, mode)
@@ -64,12 +69,20 @@ function DashboardSwitcher(props) {
   }
   const onCopy = store.example ? copyToMine : undefined
 
+  // On your own dashboard: add a copy of Alex's 🎮 Fun tab in one click.
+  function addGamesTab() {
+    const example = createStore({ seed: exampleSeed(), example: true })
+    if (copyToOwnDashboards(example, { id: 'fun', name: '🎮 Fun' }, store))
+      showToast('Added the 🎮 Fun tab: an arcade, a daily word game and game links.')
+  }
+
   return (
     <Dashboard
       key={dashboards.active.id}
       layoutKey={layoutKeyFor(dashboards.active.id)}
       tabs={<DashboardTabs dashboards={dashboards} editingId={editingId} setEditingId={setEditingId} onCopy={onCopy} />}
       onCopyTab={onCopy && (() => onCopy(dashboards.active))}
+      onAddGamesTab={store.example ? undefined : addGamesTab}
       {...props}
     />
   )

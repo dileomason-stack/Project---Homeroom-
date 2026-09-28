@@ -132,7 +132,7 @@ function SidebarFrame({ onHide, dropping, children }) {
   )
 }
 
-export default function Dashboard({ layoutKey, tabs, hasOwn, onBuildOwn, onViewExample, onResetExample, onCopyTab }) {
+export default function Dashboard({ layoutKey, tabs, hasOwn, onBuildOwn, onViewExample, onResetExample, onCopyTab, onAddGamesTab }) {
   const store = useStore()
   const [layout, setLayout] = useStoreValue(layoutKey, OWN_DEFAULT_LAYOUT, isLayout)
   const [maximizedId, setMaximizedId] = useState(null)
@@ -608,6 +608,21 @@ export default function Dashboard({ layoutKey, tabs, hasOwn, onBuildOwn, onViewE
       onAddWidget={(type, at) => addWidget(type, 'workspace', at)}
       onDropLink={dropLink}
       showStarter={sidebarWidgets.length === 0 && dockWidgets.length === 0}
+      starterActions={
+        !store.example && (
+          <div className="starter-quick">
+            <span>New here?</span>
+            <button type="button" className="primary" onClick={onViewExample}>
+              👀 See an example dashboard
+            </button>
+            {onAddGamesTab && (
+              <button type="button" onClick={onAddGamesTab}>
+                🎮 Add the Games tab
+              </button>
+            )}
+          </div>
+        )
+      }
       renderWidget={renderSlot('workspace')}
       stacked={stacked}
     />
@@ -656,8 +671,8 @@ export default function Dashboard({ layoutKey, tabs, hasOwn, onBuildOwn, onViewE
             {store.example ? 'Reset' : 'Clear all'}
           </button>
           {!store.example && (
-            <button type="button" className="link-button" onClick={onViewExample}>
-              View example
+            <button type="button" className="example-button" onClick={onViewExample} title="A sample dashboard showing what Homeroom can do">
+              👀 See an example
             </button>
           )}
         </div>

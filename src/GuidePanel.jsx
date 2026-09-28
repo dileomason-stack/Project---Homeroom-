@@ -7,10 +7,9 @@ const SECTIONS = [
   {
     title: 'Getting started',
     items: [
-      ['Try the example first', 'Alex’s dashboards show what Homeroom can do. They reset every time you reload.'],
-      ['Build your own', 'Click “Build your own” to start from a blank dashboard. Yours is saved in this browser.'],
-      ['Copy a tab you like', 'In the example, click “⧉ Copy this tab” (or right-click a tab → Copy to my dashboards) to add it to your own dashboards, cards and all.'],
-      ['Add cards', 'Use “+ Add widget” and choose Sidebar or Workspace.'],
+      ['Your dashboard', 'Homeroom opens on your own dashboard, saved in this browser. Add cards with “+ Add widget”.'],
+      ['See an example', 'Click “👀 See an example” for Alex’s sample dashboards, a quick tour of what Homeroom can do. They reset every time you reload.'],
+      ['Copy a tab you like', 'In the example, click “⧉ Copy this tab” (or right-click a tab → Copy to my dashboards). On a blank dashboard, “🎮 Add the Games tab” adds the arcade in one click.'],
     ],
   },
   {

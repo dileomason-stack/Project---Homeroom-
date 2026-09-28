@@ -54,6 +54,8 @@ export default function Workspace({
   onAddWidget,
   onDropLink,
   showStarter,
+  // Shown at the top of the blank-dashboard starter (e.g. See an example).
+  starterActions,
   renderWidget,
   stacked,
 }) {
@@ -137,7 +139,8 @@ export default function Workspace({
         {showStarter ? (
           <div className="empty-area starter">
             <h2>Start building your dashboard</h2>
-            <p>Click a widget to add it. Drag it by its ⠿ grip, resize it from the corner, and right-click for more.</p>
+            {starterActions}
+            <p>Click a widget to add it. Drag it anywhere to move it, resize it from any edge, and right-click for more.</p>
             <div className="starter-grid">
               {Object.entries(WIDGETS).map(([type, widget]) => {
                 const Icon = widget.tab.icon
