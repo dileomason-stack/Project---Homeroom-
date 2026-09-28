@@ -3620,7 +3620,7 @@ a.canvas-title:hover {
 
 .card-spotify .card-top {
   position: relative;
-  height: 18px;
+  height: 22px;
   padding: 0 4px 0 4px;
   cursor: grab;
 }
@@ -3628,10 +3628,10 @@ a.canvas-title:hover {
 .card-spotify .card-top::before {
   content: '';
   position: absolute;
-  top: 7px;
+  top: 8px;
   left: 50%;
-  width: 40px;
-  height: 4px;
+  width: 56px;
+  height: 5px;
   border-radius: 2px;
   background: var(--text-muted);
   opacity: 0.45;

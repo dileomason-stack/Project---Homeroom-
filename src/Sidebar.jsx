@@ -6,14 +6,16 @@ import { WIDGETS } from './widgets/registry.js'
 const COLLAPSED_HEIGHT = 40
 
 // Card heights (px) where Spotify's player fills the card: its 80px compact,
-// 152px standard and 352px track-list layouts, plus the 18px grab bar. A
+// 152px standard and 352px track-list layouts, plus the 22px grab bar. A
 // Spotify card snaps to the nearest one when resized (above the tallest,
 // the track list simply grows).
-const SPOTIFY_HEIGHTS = [98, 170, 370]
+const SPOTIFY_HEIGHTS = [102, 174, 374]
 
-// Empty space under the last card, so cards don't have to fill the whole
-// column: drag the pill under the last card up to make it shorter.
+// Empty space above the first card and under the last one, so cards don't
+// have to fill the whole column: drag the pill above the first card down,
+// or the one under the last card up, to make it shorter.
 const SPACE = 'sidebar-space'
+const SPACE_TOP = 'sidebar-space-top'
 
 // Give every widget its saved share of the column (in %), splitting any
 // missing share evenly, then scale so the shares add up to 100. The empty
@@ -24,8 +26,10 @@ function sharesFor(ids, saved) {
   const fallback = known.length ? knownTotal / known.length : 100 / ids.length
   const raw = ids.map((id) => (saved[id] > 0 ? saved[id] : fallback))
   const space = saved[SPACE] > 0 ? saved[SPACE] : 0
-  const total = raw.reduce((sum, value) => sum + value, 0) + space
+  const spaceTop = saved[SPACE_TOP] > 0 ? saved[SPACE_TOP] : 0
+  const total = raw.reduce((sum, value) => sum + value, 0) + space + spaceTop
   return {
+    [SPACE_TOP]: (spaceTop / total) * 100,
     ...Object.fromEntries(ids.map((id, index) => [id, (raw[index] / total) * 100])),
     [SPACE]: (space / total) * 100,
   }
@@ -148,6 +152,8 @@ export default function Sidebar({ widgets, collapsed, sizes, onSizesChange, onRe
         snapSpotify()
       }}
     >
+      <Panel id={SPACE_TOP} minSize={0} className="sidebar-space" />
+      <Separator className="resize-handle horizontal" title="Drag down to make the card below shorter" />
       {widgets.map((widget, index) => (
         <Fragment key={widget.id}>
           {index > 0 && <Separator className="resize-handle horizontal" title="Drag to resize these cards" />}

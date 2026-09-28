@@ -10,7 +10,7 @@ import { WIDGETS } from './widgets/registry.js'
 import { SPOTIFY_FILL_HEIGHTS } from './lib/spotifyPlayer.js'
 
 // A Spotify card's top strip (its grab bar), above the player.
-const SPOTIFY_BAR = 18
+const SPOTIFY_BAR = 22
 
 // After resizing a Spotify card, snap it to the nearest height its player
 // fills (see SPOTIFY_FILL_HEIGHTS); taller than the track-list size is fine.
@@ -41,6 +41,9 @@ function buildLayout(widgets, grid, collapsed) {
       h: Math.max(position.h, minH),
       minW,
       minH,
+      // A Spotify card's top edge is its grab bar, so it moves the card
+      // rather than resizing it (Spotify's heights snap anyway).
+      ...(widget.type === 'spotify' ? { resizeHandles: ['e', 's', 'w', 'se', 'sw'] } : {}),
     })
   }
   return layout

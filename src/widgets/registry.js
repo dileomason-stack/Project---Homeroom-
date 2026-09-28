@@ -68,11 +68,11 @@ export const WIDGETS = {
     description: 'A playlist, album, or podcast player',
     component: SpotifyWidget,
     editLabel: 'Change playlist',
-    // 80px is Spotify's compact player, plus the 18px grab bar on top. Taller
+    // 80px is Spotify's compact player, plus the 22px grab bar on top. Taller
     // cards get Spotify's bigger layouts (larger art, then the track list).
-    sidebarHeight: 98,
+    sidebarHeight: 102,
     colorable: false,
-    size: { w: 16, h: 22, minW: 12, minH: 13 }, // 22 rows: the standard 152px player
+    size: { w: 16, h: 23, minW: 12, minH: 13 }, // 23 rows: the standard 152px player
     tab: { title: 'Spotify', address: 'open.spotify.com', href: 'https://open.spotify.com', icon: SpotifyIcon },
   },
   todo: {
