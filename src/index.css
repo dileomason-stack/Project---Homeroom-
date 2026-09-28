@@ -3640,7 +3640,37 @@ a.canvas-title:hover {
 }
 
 .card-spotify:hover .card-top::before {
-  opacity: 0.9;
+  opacity: 0;
+}
+
+/* Hovering the card, the bar says what it's for (clicks on the player go to
+   Spotify, so this bar is the only place to grab it). */
+.card-spotify .card-top::after {
+  content: '⠿ Drag here to move';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.card-spotify:hover .card-top::after,
+.card-spotify .card-top:hover::after {
+  opacity: 1;
+}
+
+.card-spotify .card-top:hover {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .react-grid-item.react-draggable-dragging .card-spotify .card-top {
