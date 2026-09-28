@@ -87,7 +87,10 @@ function useNow() {
   return now
 }
 
-export default function DayView({ events, footer }) {
+// onNewEvent(start) / onEventClick(event): optional; when given, clicking an
+// empty time (rounded to the half hour) or an event calls them, and a
+// "+ New event" button shows in the header.
+export default function DayView({ events, footer, onNewEvent, onEventClick }) {
   const now = useNow()
   const [day, setDay] = useState(() => startOfDay(new Date()))
   const scrollRef = useRef(null)
@@ -128,12 +131,32 @@ export default function DayView({ events, footer }) {
           </button>
         )}
         <span className="dayview-month">{day.toLocaleDateString(undefined, { month: 'long' })}</span>
+        {onNewEvent && (
+          <button
+            type="button"
+            className="dayview-new"
+            onClick={() => {
+              const start = new Date(day)
+              const hour = isToday ? now.getHours() + 1 : 9
+              start.setHours(Math.min(hour, 23), 0, 0, 0)
+              onNewEvent(start)
+            }}
+            title="New event"
+          >
+            + New
+          </button>
+        )}
       </div>
 
       {allDay.length > 0 && (
         <ul className="dayview-allday">
           {allDay.map((event) => (
-            <li key={event.id} style={eventColors(event)}>
+            <li
+              key={event.id}
+              style={eventColors(event)}
+              className={onEventClick ? 'clickable' : undefined}
+              onClick={onEventClick && (() => onEventClick(event))}
+            >
               {event.title}
             </li>
           ))}
@@ -141,7 +164,21 @@ export default function DayView({ events, footer }) {
       )}
 
       <div className="dayview-scroll" ref={scrollRef}>
-        <div className="dayview-grid" style={{ height: 24 * HOUR_HEIGHT }}>
+        <div
+          className={`dayview-grid${onNewEvent ? ' clickable' : ''}`}
+          style={{ height: 24 * HOUR_HEIGHT }}
+          onClick={
+            onNewEvent &&
+            ((event) => {
+              if (event.target.closest('.dayview-event')) return
+              const y = event.clientY - event.currentTarget.getBoundingClientRect().top
+              const halfHours = Math.max(0, Math.min(47, Math.floor((y / HOUR_HEIGHT) * 2)))
+              const start = new Date(day)
+              start.setHours(Math.floor(halfHours / 2), (halfHours % 2) * 30, 0, 0)
+              onNewEvent(start)
+            })
+          }
+        >
           {Array.from({ length: 24 }, (_, hour) => (
             <div key={hour} className="dayview-hour" style={{ top: hour * HOUR_HEIGHT }}>
               {hour > 0 && (
@@ -159,7 +196,8 @@ export default function DayView({ events, footer }) {
             return (
               <div
                 key={event.id}
-                className={`dayview-event${short ? ' short' : ''}`}
+                className={`dayview-event${short ? ' short' : ''}${onEventClick ? ' clickable' : ''}`}
+                onClick={onEventClick && (() => onEventClick(event))}
                 style={{
                   ...eventColors(event),
                   top: (top / (60 * 60 * 1000)) * HOUR_HEIGHT,

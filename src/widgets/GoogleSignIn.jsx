@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { connectGoogle } from '../lib/google.js'
 
-// A "Sign in with Google" button in Google's style. It asks for `scopes`
-// (read-only) and calls onConnected once Google says yes.
-export default function GoogleSignIn({ scopes, label = 'Sign in with Google', onConnected }) {
+// A "Sign in with Google" button in Google's style. It asks for `scopes` and
+// calls onConnected once Google grants the `required` ones (all of them
+// unless said otherwise; people can untick optional ones on Google's screen).
+export default function GoogleSignIn({ scopes, required = scopes, label = 'Sign in with Google', onConnected }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -12,7 +13,7 @@ export default function GoogleSignIn({ scopes, label = 'Sign in with Google', on
     setError('')
     try {
       const google = await connectGoogle(scopes)
-      if (scopes.every((scope) => google.scopes.includes(scope))) onConnected?.()
+      if (required.every((scope) => google.scopes.includes(scope))) onConnected?.()
       else setError('Homeroom needs the box for this checked on Google’s screen. Try again and leave it checked.')
     } catch (problem) {
       setError(problem.message)

@@ -13,6 +13,8 @@ export const GOOGLE_CLIENT_ID = '21939805646-amhigjvluh702lnn6lk0hfr0urak5gqb.ap
 
 export const SCOPES = {
   calendar: 'https://www.googleapis.com/auth/calendar.readonly',
+  // Add, edit and delete events (not whole calendars or settings).
+  calendarEvents: 'https://www.googleapis.com/auth/calendar.events',
   gmail: 'https://www.googleapis.com/auth/gmail.readonly',
 }
 
@@ -150,4 +152,29 @@ export async function googleFetch(url, token = state) {
   }
   if (!response.ok) throw new Error(`Google had a problem (error ${response.status}). Try again in a minute.`)
   return response.json()
+}
+
+// A change (POST / PATCH / DELETE) to one of Google's APIs.
+export async function googleSend(url, method, body, token = state) {
+  if (!token || token.expiresAt < Date.now()) {
+    setState(null)
+    throw Object.assign(new Error('Your Google connection ran out. Reconnect to keep going.'), { expired: true })
+  }
+  let response
+  try {
+    response = await fetch(url, {
+      method,
+      headers: { authorization: `Bearer ${token.accessToken}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    })
+  } catch {
+    throw new Error('You seem to be offline. Check your connection.')
+  }
+  if (response.status === 401) {
+    setState(null)
+    throw Object.assign(new Error('Your Google connection ran out. Reconnect to keep going.'), { expired: true })
+  }
+  if (response.status === 403) throw new Error('Google says this calendar can’t be changed from your account.')
+  if (!response.ok) throw new Error(`Google had a problem (error ${response.status}). Try again.`)
+  return response.status === 204 ? null : response.json()
 }

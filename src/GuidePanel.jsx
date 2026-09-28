@@ -44,7 +44,7 @@ const SECTIONS = [
     title: 'Connecting your accounts',
     items: [
       ['Canvas', 'In Canvas, open Calendar → “Calendar Feed” (bottom right), copy the link, paste it into the Canvas card.'],
-      ['Google Calendar', 'Sign in with Google for your real events and colors, or just type your Google email for Google’s own view (Day / Week / Month / List, zoom with − / +).'],
+      ['Google Calendar', 'Sign in with Google for your real events and colors: click an empty time (or + New) to add an event, click an event to change or delete it. Or just type your Google email for Google’s own view.'],
       ['Spotify', 'In Spotify, Share → Copy link on a playlist or album. Liked Songs can’t be shared: copy them into a playlist first.'],
       ['Sleeper', 'Type your Sleeper username. Live points and a scoring banner update during games.'],
       ['Google Docs & Drive', 'Share the file as “Anyone with the link”, then paste the link.'],
@@ -63,7 +63,7 @@ const SECTIONS = [
     items: [
       ['Saved in your browser', 'Your dashboards, to-dos and links stay in this browser. There’s no account and nothing to sign up for.'],
       ['Private links', 'Your Canvas feed link is only used to fetch your assignments. It’s never stored on a server.'],
-      ['Sign in with Google', 'Calendar and Mail can show your real events and inbox, read-only. Google handles the sign-in in its own window; the access it gives lasts about an hour and stays in that browser tab. “Sign out” ends it.'],
+      ['Sign in with Google', 'Calendar and Mail can show your real events and inbox (Mail is read-only; Calendar can add and edit events if you allow it). Google handles the sign-in in its own window; the access it gives lasts about an hour and stays in that browser tab. “Sign out” ends it.'],
     ],
   },
 ]

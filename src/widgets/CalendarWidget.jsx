@@ -5,8 +5,9 @@ import { checkGoogleIcsUrl, looksLikeGoogleIcs } from '../lib/gcalFeed.js'
 import { formatTime } from '../lib/dates.js'
 import { useLoader } from '../lib/useFetch.js'
 import { useStore, useStoreValue, widgetDataKey } from '../storage.js'
-import { disconnectGoogle, googleFetch, hasScope, SCOPES, useGoogle } from '../lib/google.js'
+import { connectGoogle, disconnectGoogle, googleFetch, googleSend, hasScope, SCOPES, useGoogle } from '../lib/google.js'
 import DayView from './DayView.jsx'
+import EventEditor from './EventEditor.jsx'
 import GoogleSignIn from './GoogleSignIn.jsx'
 
 // Settings, one of:
@@ -207,15 +208,28 @@ async function loadGoogleCalendar(google) {
           end: event.end?.date ?? event.end?.dateTime,
           color: color?.background ?? calendar.backgroundColor,
           textColor: color?.foreground ?? calendar.foregroundColor,
+          calendarId: calendar.id,
+          eventId: event.id,
+          editable: calendar.accessRole === 'owner' || calendar.accessRole === 'writer',
+          recurring: Boolean(event.recurringEventId),
         }
       }),
   )
   return { events, fetchedAt: new Date().toISOString() }
 }
 
+const CALENDAR_API = 'https://www.googleapis.com/calendar/v3'
+const withoutEmpty = (body) =>
+  JSON.parse(JSON.stringify(body, (key, value) => (value === null || value === '' ? undefined : value)))
+// Ask for editing along with reading, but keep going if someone unticks it.
+const CALENDAR_SCOPES = [SCOPES.calendar, SCOPES.calendarEvents]
+
 function GoogleCalendar({ onReset }) {
   const google = useGoogle()
   const connected = hasScope(google, SCOPES.calendar)
+  const canEdit = hasScope(google, SCOPES.calendarEvents)
+  // { event } to edit one, { start } for a new one, or null.
+  const [editing, setEditing] = useState(null)
   const { data, error, loading, reload } = useLoader(
     connected ? `gcal|${google.email}|${google.expiresAt}` : null,
     () => loadGoogleCalendar(google),
@@ -226,7 +240,7 @@ function GoogleCalendar({ onReset }) {
     return (
       <div className="widget-message">
         <p>Reconnect to see your Google Calendar (the connection lasts about an hour, in this tab).</p>
-        <GoogleSignIn scopes={[SCOPES.calendar]} label="Reconnect Google Calendar" />
+        <GoogleSignIn scopes={CALENDAR_SCOPES} required={[SCOPES.calendar]} label="Reconnect Google Calendar" />
         <button type="button" className="link-button" onClick={onReset}>
           Use a different way
         </button>
@@ -244,25 +258,63 @@ function GoogleCalendar({ onReset }) {
     )
   }
   if (loading) return <p className="empty-state">Loading your calendar…</p>
+
+  const eventUrl = (event) =>
+    `${CALENDAR_API}/calendars/${encodeURIComponent(event.calendarId)}/events/${encodeURIComponent(event.eventId)}`
+
   return (
-    <DayView
-      events={data.events}
-      footer={
-        <p className="dayview-footer">
-          {google.email ? `${google.email} · ` : ''}Updated {formatTime(new Date(data.fetchedAt))} ·{' '}
-          <button
-            type="button"
-            className="link-button"
-            onClick={() => {
-              disconnectGoogle()
-              onReset()
-            }}
-          >
-            Sign out
-          </button>
-        </p>
-      }
-    />
+    <>
+      <DayView
+        events={data.events}
+        onNewEvent={canEdit ? (start) => setEditing({ start }) : undefined}
+        onEventClick={canEdit ? (event) => event.editable && setEditing({ event }) : undefined}
+        footer={
+          <p className="dayview-footer">
+            {google.email ? `${google.email} · ` : ''}Updated {formatTime(new Date(data.fetchedAt))} ·{' '}
+            {!canEdit && (
+              <>
+                <button type="button" className="link-button" onClick={() => connectGoogle(CALENDAR_SCOPES).catch(() => {})}>
+                  ✏️ Turn on editing
+                </button>
+                {' · '}
+              </>
+            )}
+            <button
+              type="button"
+              className="link-button"
+              onClick={() => {
+                disconnectGoogle()
+                onReset()
+              }}
+            >
+              Sign out
+            </button>
+          </p>
+        }
+      />
+      {editing && (
+        <EventEditor
+          event={editing.event ?? null}
+          start={editing.start}
+          onClose={() => setEditing(null)}
+          onSave={async (body) => {
+            if (editing.event) await googleSend(eventUrl(editing.event), 'PATCH', body)
+            // A new event only needs the fields that are set (the empty ones clear
+            // old values when editing).
+            else await googleSend(`${CALENDAR_API}/calendars/primary/events`, 'POST', withoutEmpty(body))
+            reload()
+          }}
+          onDelete={
+            editing.event
+              ? async () => {
+                  await googleSend(eventUrl(editing.event), 'DELETE')
+                  reload()
+                }
+              : undefined
+          }
+        />
+      )}
+    </>
   )
 }
 
@@ -286,8 +338,8 @@ function CalendarSetup({ canSignIn, onGoogle, onSave, onSample }) {
       {canSignIn && (
         <>
           <div className="calendar-setup-google">
-            <GoogleSignIn scopes={[SCOPES.calendar]} onConnected={onGoogle} />
-            <p className="setup-note">Your real events and colors · read-only</p>
+            <GoogleSignIn scopes={CALENDAR_SCOPES} required={[SCOPES.calendar]} onConnected={onGoogle} />
+            <p className="setup-note">Your real events and colors · add and edit events</p>
           </div>
           <p className="setup-divider">
             <span>or</span>
