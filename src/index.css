@@ -4703,3 +4703,47 @@ a.canvas-title:hover {
   resize: vertical;
   font: inherit;
 }
+
+/* Mail: Gmail | Outlook switch and "+ Outlook" / "+ Gmail" on the unread line. */
+.mail-switch {
+  flex: none;
+  display: flex;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+
+.mail-switch button {
+  padding: 2px 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.mail-switch button.active {
+  background: var(--page);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+}
+
+.mail-add-account {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.inbox-head .google-signin {
+  flex: none;
+}
+
+.inbox-head .inbox-count {
+  flex: 1;
+}

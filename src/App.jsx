@@ -8,6 +8,7 @@ import { layoutKeyFor, useDashboards } from './useDashboards.js'
 import { copyToOwnDashboards, HAS_OWN_KEY, OWN_PREFIX } from './lib/copyDashboard.js'
 import { showToast } from './lib/toast.js'
 import { restoreGoogle, useGoogle } from './lib/google.js'
+import { restoreMicrosoft } from './lib/microsoft.js'
 import { startSync } from './lib/sync.js'
 
 // "own": the visitor's own dashboard, saved in this browser. It's where
@@ -41,6 +42,7 @@ export default function App() {
   // Stay signed in to Google across visits (see lib/google.js).
   useEffect(() => {
     restoreGoogle()
+    restoreMicrosoft()
   }, [])
   useEffect(() => {
     if (store.example || !google?.accessToken || !google.scopes?.includes('openid')) return

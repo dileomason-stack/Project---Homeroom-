@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { openExternal } from '../lib/openExternal.js'
-import { googleFetch, hasScope, SCOPES, useGoogle } from '../lib/google.js'
+import { connectGoogle, googleFetch, hasScope, SCOPES, useGoogle } from '../lib/google.js'
+import { connectMicrosoft, graphFetch, outlookAvailable, useMicrosoft } from '../lib/microsoft.js'
 import { useLoader } from '../lib/useFetch.js'
 import { useStore, useStoreValue, widgetDataKey } from '../storage.js'
 import GoogleSignIn from './GoogleSignIn.jsx'
@@ -128,9 +129,9 @@ async function loadInbox(google) {
   }
 }
 
-// compose: a small button shown on the unread line (when the inbox is the
-// whole card).
-function GmailInbox({ compose }) {
+// compose / switcher: small controls shown on the unread line (when the inbox
+// is the whole card).
+function GmailInbox({ compose, switcher }) {
   const google = useGoogle()
   const connected = hasScope(google, SCOPES.gmail)
   const { data, error, loading, reload } = useLoader(
@@ -165,6 +166,7 @@ function GmailInbox({ compose }) {
         <p className="inbox-count">
           {data.unread ? `${data.unread} unread` : 'All caught up'} <span>· {google.email ?? 'your inbox'}</span>
         </p>
+        {switcher}
         {compose}
       </div>
       <ul className="inbox-list">
@@ -183,6 +185,113 @@ function GmailInbox({ compose }) {
   )
 }
 
+// Your Outlook inbox (read-only), through Microsoft Graph.
+async function loadOutlook() {
+  const [folder, list] = await Promise.all([
+    graphFetch('/me/mailFolders/inbox?$select=unreadItemCount'),
+    graphFetch(
+      '/me/mailFolders/inbox/messages?$top=12&$orderby=receivedDateTime desc&$select=subject,from,receivedDateTime,isRead,bodyPreview,webLink',
+    ),
+  ])
+  return {
+    unread: folder.unreadItemCount ?? 0,
+    emails: (list.value ?? []).map((message) => ({
+      id: message.id,
+      from: message.from?.emailAddress?.name || message.from?.emailAddress?.address || '(unknown sender)',
+      subject: message.subject || '(no subject)',
+      snippet: message.bodyPreview ?? '',
+      time: shortTime(new Date(message.receivedDateTime)),
+      unread: !message.isRead,
+      link: message.webLink,
+    })),
+  }
+}
+
+function OutlookInbox({ compose, switcher }) {
+  const microsoft = useMicrosoft()
+  const { data, error, loading, reload } = useLoader(
+    microsoft ? `outlook|${microsoft.email}|${microsoft.expiresAt}` : null,
+    loadOutlook,
+    2 * 60 * 1000,
+  )
+  if (error) {
+    return (
+      <div className="inbox-connect">
+        <p className="form-error">{error}</p>
+        <button type="button" onClick={reload}>
+          Try again
+        </button>
+      </div>
+    )
+  }
+  if (loading) return <p className="empty-state">Loading your inbox…</p>
+  return (
+    <>
+      <div className="inbox-head">
+        <p className="inbox-count">
+          {data.unread ? `${data.unread} unread` : 'All caught up'} <span>· {microsoft.email ?? 'Outlook'}</span>
+        </p>
+        {switcher}
+        {compose}
+      </div>
+      <ul className="inbox-list">
+        {data.emails.map((email) => (
+          <li key={email.id}>
+            <button type="button" className={email.unread ? undefined : 'read'} onClick={() => email.link && open(email.link)}>
+              <span className="inbox-from">{email.from}</span>
+              <span className="inbox-time">{email.time}</span>
+              <span className="inbox-subject">{email.subject}</span>
+              <span className="inbox-snippet">{email.snippet}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+// "Show my Outlook inbox", in Microsoft's style.
+function MicrosoftSignIn({ label = 'Show my Outlook inbox', compact }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  async function signIn() {
+    setBusy(true)
+    setError('')
+    try {
+      await connectMicrosoft()
+    } catch (problem) {
+      setError(problem.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="google-signin">
+      <button type="button" className={compact ? 'mail-add-account' : 'google-signin-button'} onClick={signIn} disabled={busy}>
+        <svg viewBox="0 0 21 21" aria-hidden="true" width="16" height="16">
+          <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+          <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+          <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+          <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+        </svg>
+        {busy ? 'Waiting for Microsoft…' : label}
+      </button>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// Outlook's compose page: outlook.live.com for personal accounts, Office 365
+// for school and work accounts.
+function outlookCompose(email) {
+  const personal = /@(outlook|hotmail|live|msn)\./i.test(email ?? '')
+  return personal ? 'https://outlook.live.com/mail/0/deeplink/compose' : 'https://outlook.office.com/mail/deeplink/compose'
+}
+
 export default function InboxWidget({ id }) {
   const [settings, setSettings] = useStoreValue(widgetDataKey(id), NO_SETTINGS, isSettings)
   const [query, setQuery] = useState('')
@@ -191,6 +300,8 @@ export default function InboxWidget({ id }) {
   const google = useGoogle()
   const showingGmail = !settings.sample && !store.example
   const gmailConnected = showingGmail && hasScope(google, SCOPES.gmail)
+  const microsoft = useMicrosoft()
+  const outlookConnected = showingGmail && Boolean(microsoft)
   const read = settings.read ?? {}
   const unread = SAMPLE_EMAILS.filter((email) => !read[email.id]).length
 
@@ -198,27 +309,64 @@ export default function InboxWidget({ id }) {
   // compose button (the app tiles and search come back if you sign out).
   // The flag also sets the card's badge (see useFor in registry.js).
   useEffect(() => {
-    if (gmailConnected !== Boolean(settings.gmail)) setSettings((current) => ({ ...current, gmail: gmailConnected }))
-  }, [gmailConnected, settings.gmail, setSettings])
+    if (gmailConnected !== Boolean(settings.gmail) || outlookConnected !== Boolean(settings.outlook)) {
+      setSettings((current) => ({ ...current, gmail: gmailConnected, outlook: outlookConnected }))
+    }
+  }, [gmailConnected, outlookConnected, settings.gmail, settings.outlook, setSettings])
 
-  if (gmailConnected) {
+  if (gmailConnected || outlookConnected) {
+    // Both connected: a small Gmail | Outlook switch picks which inbox shows.
+    const view = gmailConnected && outlookConnected ? (settings.mailView ?? 'gmail') : gmailConnected ? 'gmail' : 'outlook'
+    const switcher =
+      gmailConnected && outlookConnected ? (
+        <div className="mail-switch" role="tablist" aria-label="Which inbox">
+          {[
+            ['gmail', 'Gmail'],
+            ['outlook', 'Outlook'],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={view === key}
+              className={view === key ? 'active' : undefined}
+              onClick={() => setSettings((current) => ({ ...current, mailView: key }))}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : gmailConnected && outlookAvailable() ? (
+        <MicrosoftSignIn label="+ Outlook" compact />
+      ) : !gmailConnected ? (
+        <button type="button" className="mail-add-account" onClick={() => connectGoogle([SCOPES.gmail]).catch(() => {})}>
+          + Gmail
+        </button>
+      ) : null
+    const compose = (
+      <button
+        type="button"
+        className="mail-compose-icon"
+        onClick={() =>
+          open(
+            view === 'gmail'
+              ? `https://mail.google.com/mail/?authuser=${encodeURIComponent(google.email ?? '')}&view=cm&fs=1`
+              : outlookCompose(microsoft?.email),
+          )
+        }
+        title={`Write an email (opens ${view === 'gmail' ? 'Gmail' : 'Outlook'})`}
+        aria-label="Write an email"
+      >
+        ✏️
+      </button>
+    )
     return (
       <div className="inbox connected">
-        <GmailInbox
-          compose={
-            <button
-              type="button"
-              className="mail-compose-icon"
-              onClick={() =>
-                open(`https://mail.google.com/mail/?authuser=${encodeURIComponent(google.email ?? '')}&view=cm&fs=1`)
-              }
-              title="Write an email (opens Gmail)"
-              aria-label="Write an email"
-            >
-              ✏️
-            </button>
-          }
-        />
+        {view === 'gmail' ? (
+          <GmailInbox compose={compose} switcher={switcher} />
+        ) : (
+          <OutlookInbox compose={compose} switcher={switcher} />
+        )}
       </div>
     )
   }
@@ -332,7 +480,10 @@ export default function InboxWidget({ id }) {
           </ul>
         </>
       ) : showingGmail ? (
-        <GmailInbox />
+        <>
+          <GmailInbox />
+          {outlookAvailable() && <MicrosoftSignIn />}
+        </>
       ) : null}
     </div>
   )
