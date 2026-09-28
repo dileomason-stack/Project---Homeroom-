@@ -64,7 +64,7 @@ const SECTIONS = [
       ['Saved in your browser', 'Your dashboards, to-dos and links are saved in this browser. There’s nothing to sign up for.'],
       ['Synced when you sign in', 'Signed in with Google (⋯ menu, or the Calendar or Mail card)? Your dashboard also saves to your Google account, so it shows up on any device where you sign in. Sign out any time from the ⋯ menu.'],
       ['Private links', 'Your Canvas feed link is only used to fetch your assignments. It’s never stored on a server.'],
-      ['Sign in with Google', 'Calendar and Mail can show your real events and inbox (Mail is read-only; Calendar can add and edit events if you allow it). Google handles the sign-in in its own window; the access it gives lasts about an hour and stays in that browser tab. “Sign out” ends it.'],
+      ['Sign in with Google', 'Calendar and Mail can show your real events and inbox (Mail is read-only; Calendar can add and edit events if you allow it). Google handles the sign-in in its own window, and you stay signed in (about a week at a time while Homeroom is in testing). “Sign out of Google” in the ⋯ menu ends it.'],
     ],
   },
 ]

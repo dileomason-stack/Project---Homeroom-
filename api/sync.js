@@ -1,4 +1,5 @@
 import { GOOGLE_CLIENT_ID } from '../src/lib/googleConfig.js'
+import { redis, storage } from './_lib/redis.js'
 
 // GET  /api/sync  -> { data, updatedAt } (or { data: null })
 // PUT  /api/sync  { data, updatedAt }  -> { ok: true }
@@ -18,12 +19,6 @@ function json(status, body) {
   })
 }
 
-function storage() {
-  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL
-  const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN
-  return url && token ? { url: url.replace(/\/$/, ''), token } : null
-}
-
 // Which Google account a sign-in token belongs to, or null.
 async function accountFor(request) {
   const token = request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1]
@@ -39,17 +34,6 @@ async function accountFor(request) {
   } catch {
     return null
   }
-}
-
-async function redis(store, command, ...args) {
-  const response = await fetch(store.url, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${store.token}`, 'content-type': 'application/json' },
-    body: JSON.stringify([command, ...args]),
-    signal: AbortSignal.timeout(5000),
-  })
-  if (!response.ok) throw new Error(`storage ${response.status}`)
-  return (await response.json()).result
 }
 
 const keyFor = (account) => `homeroom:dashboard:${account.id}`

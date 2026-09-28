@@ -23,7 +23,10 @@ function vercelApiInDev() {
           const hasBody = !['GET', 'HEAD'].includes(req.method)
           const request = new Request(`http://localhost${req.url}`, {
             method: req.method,
-            headers: { 'content-type': req.headers['content-type'] ?? '' },
+            // Pass along the headers api files read (sign-in token, cookie).
+            headers: Object.fromEntries(
+              ['content-type', 'authorization', 'cookie'].filter((name) => req.headers[name]).map((name) => [name, req.headers[name]]),
+            ),
             body: hasBody ? Buffer.concat(chunks) : undefined,
           })
           const response = await handler(request)

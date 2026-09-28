@@ -1,14 +1,18 @@
 import { useSyncExternalStore } from 'react'
 
-// "Sign in with Google" for the Calendar and Mail cards, using Google's own
-// sign-in library in the browser. Google shows its sign-in and permission
-// screens in its own pop-up (Homeroom never sees a password) and hands back
-// a read-only access token that lasts about an hour. The token stays in this
-// tab only (sessionStorage), so it's gone when the tab closes; after it runs
-// out, "Reconnect" gets a fresh one in a click.
+// "Sign in with Google" for the Calendar and Mail cards (and syncing), using
+// Google's own sign-in library. Google shows its sign-in and permission
+// screens in its own pop-up (Homeroom never sees a password).
 //
-// While Homeroom's Google project is in "Testing" mode, only accounts on its
-// test-user list can sign in.
+// Staying signed in: when the site's server is set up for it (see
+// api/google-auth.js), signing in hands Google's one-time code to the server,
+// which keeps a long-lasting refresh token and gives the page hour-long
+// access tokens: on page load, and again shortly before each one runs out,
+// with no pop-up. You sign in again only after signing out, or after about a
+// week while Homeroom's Google project is in "Testing" mode. Without the
+// server, sign-ins last about an hour (in this tab).
+//
+// While in "Testing" mode, only accounts on its test-user list can sign in.
 import { GOOGLE_CLIENT_ID } from './googleConfig.js'
 
 export { GOOGLE_CLIENT_ID }
@@ -80,36 +84,115 @@ function loadScript() {
   return scriptPromise
 }
 
+// Whether the server keeps you signed in (null until the page asks it).
+let serverKeepsSignIn = null
+let renewTimer = null
+
+// Renew a few minutes before the access token runs out.
+function scheduleRenew() {
+  clearTimeout(renewTimer)
+  if (!serverKeepsSignIn || !state) return
+  renewTimer = setTimeout(() => renew().catch(() => {}), Math.max(10_000, state.expiresAt - Date.now() - 3 * 60_000))
+}
+
+// A fresh access token from the server's stored sign-in (no pop-up).
+async function renew() {
+  const response = await fetch('/api/google-auth', { credentials: 'same-origin' }).catch(() => null)
+  if (!response) return null
+  if (response.status === 503) {
+    serverKeepsSignIn = false
+    return null
+  }
+  serverKeepsSignIn = true
+  if (!response.ok) {
+    if (response.status === 401) setState(null)
+    return null
+  }
+  setState(await response.json())
+  scheduleRenew()
+  return state
+}
+
+// Called once when the page opens: signs you back in if the server has a
+// sign-in for this browser (keeping a still-fresh one from this tab if not).
+export async function restoreGoogle() {
+  const hadFresh = Boolean(state && state.expiresAt > Date.now() + 60_000)
+  const response = await fetch('/api/google-auth', { credentials: 'same-origin' }).catch(() => null)
+  if (!response) return
+  if (response.status === 503) {
+    serverKeepsSignIn = false
+    return
+  }
+  serverKeepsSignIn = true
+  if (response.ok) {
+    setState(await response.json())
+    scheduleRenew()
+  } else if (!hadFresh) setState(null)
+}
+
+function signInError(error) {
+  return new Error(
+    error === 'access_denied'
+      ? 'Google didn’t allow access. While Homeroom is in testing, only accounts on its test list can sign in.'
+      : error === 'popup_closed'
+        ? 'Sign-in was closed before it finished.'
+        : 'Google sign-in didn’t work. Try again.',
+  )
+}
+
 // Asks Google for access to `scopes` (keeping any already granted). Must be
 // called from a click, so the browser allows Google's pop-up.
 export async function connectGoogle(scopes) {
   const google = await loadScript()
   // Always who you are (email), for "signed in as" and syncing your dashboard.
   const wanted = [...new Set([...IDENTITY, ...(state?.scopes ?? []), ...scopes])]
+  const common = {
+    client_id: GOOGLE_CLIENT_ID,
+    scope: wanted.join(' '),
+    include_granted_scopes: true,
+    ...(state?.email ? { login_hint: state.email } : {}),
+  }
+
+  if (serverKeepsSignIn) {
+    // Stay signed in: Google gives a one-time code, the server does the rest.
+    const response = await new Promise((resolve, reject) => {
+      google.accounts.oauth2
+        .initCodeClient({
+          ...common,
+          ux_mode: 'popup',
+          callback: resolve,
+          error_callback: (error) => reject(signInError(error?.type)),
+        })
+        .requestCode()
+    })
+    if (response.error) throw signInError(response.error)
+    const finished = await fetch('/api/google-auth', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code: response.code }),
+    }).catch(() => null)
+    const result = await finished?.json().catch(() => null)
+    if (!finished?.ok || !result?.accessToken) throw new Error(result?.error ?? 'Google sign-in didn’t finish. Try again.')
+    setState(result)
+    scheduleRenew()
+    if (!result.email) {
+      const email = await findEmail(result).catch(() => null)
+      if (email && state === result) setState({ ...result, email })
+    }
+    return state
+  }
+
   const response = await new Promise((resolve, reject) => {
     const client = google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID,
-      scope: wanted.join(' '),
-      include_granted_scopes: true,
-      ...(state?.email ? { login_hint: state.email } : {}),
+      ...common,
       callback: resolve,
-      error_callback: (error) =>
-        reject(
-          new Error(
-            error?.type === 'popup_closed' ? 'Sign-in was closed before it finished.' : 'Google sign-in didn’t work. Try again.',
-          ),
-        ),
+      error_callback: (error) => reject(signInError(error?.type)),
     })
     // '' = only ask for permission the first time (or for new scopes).
     client.requestAccessToken({ prompt: '' })
   })
-  if (response.error) {
-    throw new Error(
-      response.error === 'access_denied'
-        ? 'Google didn’t allow access. While Homeroom is in testing, only accounts on its test list can sign in.'
-        : 'Google sign-in didn’t work. Try again.',
-    )
-  }
+  if (response.error) throw signInError(response.error)
   const granted = (response.scope ?? '').split(' ').filter(Boolean)
   const next = {
     accessToken: response.access_token,
@@ -140,51 +223,49 @@ async function findEmail(token) {
 
 export function disconnectGoogle() {
   const token = state?.accessToken
+  clearTimeout(renewTimer)
   setState(null)
+  // Forget the stored sign-in too (the server also revokes it at Google).
+  fetch('/api/google-auth', { method: 'DELETE', credentials: 'same-origin' }).catch(() => {})
   if (token && window.google?.accounts?.oauth2) window.google.accounts.oauth2.revoke(token, () => {})
+}
+
+const ranOut = () => Object.assign(new Error('Your Google connection ran out. Reconnect to keep going.'), { expired: true })
+
+// The token to use: the given one if it's still good, else a renewed one.
+async function usable(token) {
+  if (token && token.expiresAt > Date.now() + 30_000) return token
+  if (serverKeepsSignIn && (await renew())) return state
+  setState(null)
+  throw ranOut()
 }
 
 // A GET to one of Google's APIs with the current token.
 export async function googleFetch(url, token = state) {
-  if (!token || token.expiresAt < Date.now()) {
-    setState(null)
-    throw Object.assign(new Error('Your Google connection ran out. Reconnect to keep going.'), { expired: true })
-  }
-  let response
-  try {
-    response = await fetch(url, { headers: { authorization: `Bearer ${token.accessToken}` } })
-  } catch {
-    throw new Error('You seem to be offline. Check your connection.')
-  }
-  if (response.status === 401) {
-    setState(null)
-    throw Object.assign(new Error('Your Google connection ran out. Reconnect to keep going.'), { expired: true })
-  }
-  if (!response.ok) throw new Error(`Google had a problem (error ${response.status}). Try again in a minute.`)
-  return response.json()
+  return googleSend(url, 'GET', undefined, token)
 }
 
-// A change (POST / PATCH / DELETE) to one of Google's APIs.
-export async function googleSend(url, method, body, token = state) {
-  if (!token || token.expiresAt < Date.now()) {
-    setState(null)
-    throw Object.assign(new Error('Your Google connection ran out. Reconnect to keep going.'), { expired: true })
-  }
+// A request (GET / POST / PATCH / DELETE) to one of Google's APIs. If Google
+// says the token ran out, it's renewed once (when possible) and retried.
+export async function googleSend(url, method, body, token = state, retried = false) {
+  const current = await usable(token)
   let response
   try {
     response = await fetch(url, {
       method,
-      headers: { authorization: `Bearer ${token.accessToken}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+      headers: { authorization: `Bearer ${current.accessToken}`, ...(body ? { 'content-type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     })
   } catch {
     throw new Error('You seem to be offline. Check your connection.')
   }
   if (response.status === 401) {
+    if (!retried && serverKeepsSignIn && (await renew())) return googleSend(url, method, body, state, true)
     setState(null)
-    throw Object.assign(new Error('Your Google connection ran out. Reconnect to keep going.'), { expired: true })
+    throw ranOut()
   }
-  if (response.status === 403) throw new Error('Google says this calendar can’t be changed from your account.')
-  if (!response.ok) throw new Error(`Google had a problem (error ${response.status}). Try again.`)
+  if (response.status === 403 && method !== 'GET')
+    throw new Error('Google says this calendar can’t be changed from your account.')
+  if (!response.ok) throw new Error(`Google had a problem (error ${response.status}). Try again in a minute.`)
   return response.status === 204 ? null : response.json()
 }

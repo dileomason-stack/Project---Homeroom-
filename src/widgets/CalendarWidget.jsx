@@ -272,7 +272,7 @@ function GoogleCalendar({ onReset }) {
   if (!connected) {
     return (
       <div className="widget-message">
-        <p>Reconnect to see your Google Calendar (the connection lasts about an hour, in this tab).</p>
+        <p>Sign in again to see your Google Calendar.</p>
         <GoogleSignIn scopes={CALENDAR_SCOPES} required={[SCOPES.calendar]} label="Reconnect Google Calendar" />
         <button type="button" className="link-button" onClick={onReset}>
           Use a different way

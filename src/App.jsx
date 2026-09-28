@@ -7,7 +7,7 @@ import { createStore, readJSON, removeKey, StoreContext, useStore, writeJSON } f
 import { layoutKeyFor, useDashboards } from './useDashboards.js'
 import { copyToOwnDashboards, HAS_OWN_KEY, OWN_PREFIX } from './lib/copyDashboard.js'
 import { showToast } from './lib/toast.js'
-import { useGoogle } from './lib/google.js'
+import { restoreGoogle, useGoogle } from './lib/google.js'
 import { startSync } from './lib/sync.js'
 
 // "own": the visitor's own dashboard, saved in this browser. It's where
@@ -38,6 +38,10 @@ export default function App() {
   // Signed in with Google (from anywhere): your own dashboard saves to your
   // account and loads on other devices. See lib/sync.js.
   const google = useGoogle()
+  // Stay signed in to Google across visits (see lib/google.js).
+  useEffect(() => {
+    restoreGoogle()
+  }, [])
   useEffect(() => {
     if (store.example || !google?.accessToken || !google.scopes?.includes('openid')) return
     return startSync({
