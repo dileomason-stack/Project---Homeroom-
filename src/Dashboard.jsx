@@ -10,6 +10,8 @@ import Dock from './Dock.jsx'
 import { EXAMPLE_PERSON } from './example.js'
 import { COLS, createPushDownCompactor, ROW_HEIGHT, upgradeGrid } from './lib/grid.js'
 import { openExternal } from './lib/openExternal.js'
+import { connectGoogle, disconnectGoogle, preloadGoogle, useGoogle } from './lib/google.js'
+import { useSyncStatus } from './lib/sync.js'
 import { classifyLink } from './lib/classifyLink.js'
 import { droppedLink, isLinkDrag } from './lib/drag.js'
 import { showToast } from './lib/toast.js'
@@ -148,6 +150,11 @@ export default function Dashboard({ layoutKey, tabs, hasOwn, onBuildOwn, onViewE
   // The toolbar's ⋯ menu, and whether the example banner is folded to one line
   // (remembered in this browser).
   const [moreMenu, setMoreMenu] = useState(null)
+  const google = useGoogle()
+  const sync = useSyncStatus()
+  useEffect(() => {
+    preloadGoogle()
+  }, [])
   const closeMoreMenu = useCallback(() => setMoreMenu(null), [])
   const [tipsHidden, setTipsHiddenState] = useState(() => readJSON(TIPS_KEY, false) === true)
   const setTipsHidden = (hidden) => {
@@ -697,6 +704,27 @@ export default function Dashboard({ layoutKey, tabs, hasOwn, onBuildOwn, onViewE
               items={[
                 !store.example && { label: '👀 See an example', onSelect: onViewExample },
                 store.example && { label: '← Back to my dashboard', onSelect: onBuildOwn },
+                !store.example &&
+                  (google?.scopes?.includes('openid')
+                    ? {
+                        label:
+                          sync.state === 'unavailable'
+                            ? '☁️ Sync isn’t set up yet'
+                            : sync.state === 'error'
+                              ? '☁️ Sync had a problem · try again'
+                              : `☁️ Synced · ${google.email ?? 'your Google account'}`,
+                        onSelect: () =>
+                          showToast(
+                            sync.state === 'unavailable'
+                              ? 'Syncing needs its storage turned on for this site.'
+                              : 'Your dashboard saves to your Google account and loads on any device where you sign in.',
+                          ),
+                      }
+                    : {
+                        label: '☁️ Sign in to sync your devices',
+                        onSelect: () => connectGoogle([]).catch((problem) => showToast(problem.message)),
+                      }),
+                !store.example && google && { label: 'Sign out of Google', onSelect: disconnectGoogle },
                 { label: '❓ Guide', onSelect: () => setGuideOpen(true) },
                 { label: '📱 Share', onSelect: () => setSharing(true) },
                 store.example

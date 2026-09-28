@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Dashboard from './Dashboard.jsx'
 import Toast from './Toast.jsx'
 import DashboardTabs from './DashboardTabs.jsx'
@@ -7,6 +7,8 @@ import { createStore, readJSON, removeKey, StoreContext, useStore, writeJSON } f
 import { layoutKeyFor, useDashboards } from './useDashboards.js'
 import { copyToOwnDashboards, HAS_OWN_KEY, OWN_PREFIX } from './lib/copyDashboard.js'
 import { showToast } from './lib/toast.js'
+import { useGoogle } from './lib/google.js'
+import { startSync } from './lib/sync.js'
 
 // "own": the visitor's own dashboard, saved in this browser. It's where
 //   Homeroom opens for first-time visitors.
@@ -32,6 +34,22 @@ export default function App() {
   })
   // Bumped on every switch so the dashboard starts fresh (no leftover full-screen widget, etc.).
   const [generation, setGeneration] = useState(0)
+
+  // Signed in with Google (from anywhere): your own dashboard saves to your
+  // account and loads on other devices. See lib/sync.js.
+  const google = useGoogle()
+  useEffect(() => {
+    if (store.example || !google?.accessToken || !google.scopes?.includes('openid')) return
+    return startSync({
+      store,
+      google,
+      onReplaced: () => {
+        setStore(storeFor('own'))
+        setGeneration((count) => count + 1)
+        showToast('Loaded your dashboard from your Google account.')
+      },
+    })
+  }, [store, google])
 
   function switchTo(mode) {
     writeJSON(MODE_KEY, mode)

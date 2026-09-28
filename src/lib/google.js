@@ -9,7 +9,9 @@ import { useSyncExternalStore } from 'react'
 //
 // While Homeroom's Google project is in "Testing" mode, only accounts on its
 // test-user list can sign in.
-export const GOOGLE_CLIENT_ID = '21939805646-amhigjvluh702lnn6lk0hfr0urak5gqb.apps.googleusercontent.com'
+import { GOOGLE_CLIENT_ID } from './googleConfig.js'
+
+export { GOOGLE_CLIENT_ID }
 
 export const SCOPES = {
   calendar: 'https://www.googleapis.com/auth/calendar.readonly',
@@ -19,6 +21,7 @@ export const SCOPES = {
 }
 
 const TOKEN_KEY = 'homeroom:google-token'
+const IDENTITY = ['openid', 'email']
 const SCRIPT_URL = 'https://accounts.google.com/gsi/client'
 
 function readToken() {
@@ -81,7 +84,8 @@ function loadScript() {
 // called from a click, so the browser allows Google's pop-up.
 export async function connectGoogle(scopes) {
   const google = await loadScript()
-  const wanted = [...new Set([...(state?.scopes ?? []), ...scopes])]
+  // Always who you are (email), for "signed in as" and syncing your dashboard.
+  const wanted = [...new Set([...IDENTITY, ...(state?.scopes ?? []), ...scopes])]
   const response = await new Promise((resolve, reject) => {
     const client = google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
@@ -123,6 +127,8 @@ export async function connectGoogle(scopes) {
 }
 
 async function findEmail(token) {
+  const profile = await googleFetch('https://www.googleapis.com/oauth2/v3/userinfo', token).catch(() => null)
+  if (profile?.email) return profile.email
   if (hasScope(token, SCOPES.gmail)) {
     return (await googleFetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', token)).emailAddress
   }
