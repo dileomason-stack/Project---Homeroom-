@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useStoreValue, widgetDataKey } from '../storage.js'
 import { toSpotifyEmbed } from '../lib/embeds.js'
 import LinkSetup from './LinkSetup.jsx'
+import { playerHeight } from '../lib/spotifyPlayer.js'
 
 const isSettings = (value) => value && typeof value === 'object'
 const NO_SETTINGS = {}
@@ -11,20 +12,22 @@ const NO_SETTINGS = {}
 // width and scale it down, so every button stays visible.
 const PLAYER_MIN_WIDTH = 320
 
-function useWidth(ref) {
-  const [width, setWidth] = useState(null)
+function useSize(ref) {
+  const [size, setSize] = useState(null)
   useEffect(() => {
-    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width))
+    const observer = new ResizeObserver(([entry]) => setSize({ width: entry.contentRect.width, height: entry.contentRect.height }))
     observer.observe(ref.current)
     return () => observer.disconnect()
   }, [ref])
-  return width
+  return size
 }
 
 function SpotifyPlayer({ embedUrl }) {
   const ref = useRef(null)
-  const width = useWidth(ref)
-  const scale = width && width < PLAYER_MIN_WIDTH ? width / PLAYER_MIN_WIDTH : 1
+  const size = useSize(ref)
+  const scale = size && size.width < PLAYER_MIN_WIDTH ? size.width / PLAYER_MIN_WIDTH : 1
+  // Room for the player, in the player's own (unscaled) pixels.
+  const height = size ? playerHeight(size.height / scale) : undefined
 
   return (
     <div className="spotify" ref={ref}>
@@ -35,13 +38,8 @@ function SpotifyPlayer({ embedUrl }) {
         loading="lazy"
         style={
           scale < 1
-            ? {
-                width: PLAYER_MIN_WIDTH,
-                height: `${100 / scale}%`,
-                transform: `scale(${scale})`,
-                transformOrigin: 'top left',
-              }
-            : undefined
+            ? { width: PLAYER_MIN_WIDTH, height, transform: `scale(${scale})`, transformOrigin: 'top left' }
+            : { height }
         }
       />
     </div>

@@ -7,6 +7,19 @@ import { CARD_TYPE, droppedLink, isCardDrag, NOT_DRAGGABLE } from './lib/drag.js
 import { COLS, createPushDownCompactor, GAP, ROW_HEIGHT } from './lib/grid.js'
 import UseBadge from './UseBadge.jsx'
 import { WIDGETS } from './widgets/registry.js'
+import { SPOTIFY_FILL_HEIGHTS } from './lib/spotifyPlayer.js'
+
+// A Spotify card's top strip (its grab bar), above the player.
+const SPOTIFY_BAR = 18
+
+// After resizing a Spotify card, snap it to the nearest height its player
+// fills (see SPOTIFY_FILL_HEIGHTS); taller than the track-list size is fine.
+function snappedSpotifyRows(rows) {
+  const space = rows * ROW_HEIGHT - GAP - SPOTIFY_BAR
+  if (space >= SPOTIFY_FILL_HEIGHTS.at(-1)) return rows
+  const target = SPOTIFY_FILL_HEIGHTS.reduce((best, h) => (Math.abs(h - space) < Math.abs(best - space) ? h : best))
+  return Math.ceil((target + GAP + SPOTIFY_BAR) / ROW_HEIGHT)
+}
 
 // Saved position + the widget type's min size. A widget with no saved
 // position goes at the bottom, and nothing is ever smaller than its minimum.
@@ -200,7 +213,14 @@ export default function Workspace({
             clearActive()
             onCardDrop?.(oldItem?.i, event)
           }}
-          onResizeStop={clearActive}
+          onResizeStop={(finalLayout, _oldItem, item) => {
+            clearActive()
+            if (widgets.find((widget) => widget.id === item?.i)?.type !== 'spotify') return
+            const rows = snappedSpotifyRows(item.h)
+            if (rows === item.h) return
+            // After the grid library has saved its own result.
+            setTimeout(() => onGridChange(finalLayout.map(pickPosition).map((cell) => (cell.i === item.i ? { ...cell, h: rows } : cell))))
+          }}
           onLayoutChange={handleLayoutChange}
         >
           {widgets.map((widget) => (

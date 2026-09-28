@@ -72,7 +72,7 @@ export const WIDGETS = {
     // cards get Spotify's bigger layouts (larger art, then the track list).
     sidebarHeight: 98,
     colorable: false,
-    size: { w: 16, h: 20, minW: 12, minH: 12 },
+    size: { w: 16, h: 22, minW: 12, minH: 13 }, // 22 rows: the standard 152px player
     tab: { title: 'Spotify', address: 'open.spotify.com', href: 'https://open.spotify.com', icon: SpotifyIcon },
   },
   todo: {
