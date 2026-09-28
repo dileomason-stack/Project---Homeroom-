@@ -154,9 +154,10 @@ export default function DayView({ events, footer, onNewEvent, onEventClick }) {
             <li
               key={event.id}
               style={eventColors(event)}
-              className={onEventClick ? 'clickable' : undefined}
+              className={[onEventClick && 'clickable', event.kind === 'task' && 'task', event.completed && 'done'].filter(Boolean).join(' ') || undefined}
               onClick={onEventClick && (() => onEventClick(event))}
             >
+              {event.kind === 'task' && <span aria-hidden="true">{event.completed ? '☑ ' : '☐ '}</span>}
               {event.title}
             </li>
           ))}

@@ -4687,3 +4687,19 @@ a.canvas-title:hover {
   font-size: 0.95rem;
   line-height: 1;
 }
+
+/* Google Tasks in the Day view, and the Event / Task switch. */
+.dayview-allday li.task.done {
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+.event-editor-kind {
+  align-self: flex-start;
+  margin: 0;
+}
+
+.event-editor textarea {
+  resize: vertical;
+  font: inherit;
+}

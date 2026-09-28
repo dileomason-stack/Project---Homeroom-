@@ -44,7 +44,7 @@ const SECTIONS = [
     title: 'Connecting your accounts',
     items: [
       ['Canvas', 'In Canvas, open Calendar → “Calendar Feed” (bottom right), copy the link, paste it into the Canvas card.'],
-      ['Google Calendar', 'Sign in with Google for your real events and colors: click an empty time (or + New) to add an event, click an event to change or delete it. Or just type your Google email for Google’s own view.'],
+      ['Google Calendar', 'Sign in with Google for your real events and colors: click an empty time (or + New) to add an event or a Google Tasks task, click one to change it, mark it done or delete it. Or just type your Google email for Google’s own view.'],
       ['Spotify', 'In Spotify, Share → Copy link on a playlist or album. Liked Songs can’t be shared: copy them into a playlist first.'],
       ['Sleeper', 'Type your Sleeper username. Live points and a scoring banner update during games.'],
       ['Google Docs & Drive', 'Share the file as “Anyone with the link”, then paste the link.'],

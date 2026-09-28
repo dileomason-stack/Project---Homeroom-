@@ -224,14 +224,62 @@ async function loadGoogleCalendar(google) {
         }
       }),
   )
-  return { events, fetchedAt: new Date().toISOString() }
+  const tasks = hasScope(google, SCOPES.tasks) ? await loadGoogleTasks(google, from, to).catch(() => []) : []
+  return { events: [...events, ...tasks], fetchedAt: new Date().toISOString() }
+}
+
+const TASKS_API = 'https://tasks.googleapis.com/tasks/v1'
+const dayAfter = (date) => {
+  const next = new Date(`${date}T00:00:00Z`)
+  next.setUTCDate(next.getUTCDate() + 1)
+  return next.toISOString().slice(0, 10)
+}
+
+// Google Tasks with a due date in the window, from all your task lists, as
+// all-day items for the Day view (kind: 'task').
+async function loadGoogleTasks(google, from, to) {
+  const lists = (await googleFetch(`${TASKS_API}/users/@me/lists?maxResults=100`, google)).items ?? []
+  const perList = await Promise.all(
+    lists.map((list) =>
+      googleFetch(
+        `${TASKS_API}/lists/${encodeURIComponent(list.id)}/tasks?showCompleted=true&showHidden=true&maxResults=100&dueMin=${encodeURIComponent(from)}&dueMax=${encodeURIComponent(to)}`,
+        google,
+      )
+        .then((result) => ({ list, items: result.items ?? [] }))
+        .catch(() => ({ list, items: [] })),
+    ),
+  )
+  return perList.flatMap(({ list, items }) =>
+    items
+      .filter((task) => task.due && task.title)
+      .map((task) => {
+        const date = task.due.slice(0, 10)
+        const completed = task.status === 'completed'
+        return {
+          id: `task-${list.id}-${task.id}`,
+          kind: 'task',
+          listId: list.id,
+          taskId: task.id,
+          title: task.title,
+          notes: task.notes ?? '',
+          completed,
+          allDay: true,
+          start: date,
+          end: dayAfter(date),
+          color: completed ? '#9aa0a6' : '#1a73e8',
+          textColor: '#fff',
+          editable: true,
+        }
+      }),
+  )
 }
 
 const CALENDAR_API = 'https://www.googleapis.com/calendar/v3'
 const withoutEmpty = (body) =>
   JSON.parse(JSON.stringify(body, (key, value) => (value === null || value === '' ? undefined : value)))
-// Ask for editing along with reading, but keep going if someone unticks it.
-const CALENDAR_SCOPES = [SCOPES.calendar, SCOPES.calendarEvents]
+// Ask for editing (and Google Tasks) along with reading, but keep going if
+// someone unticks those.
+const CALENDAR_SCOPES = [SCOPES.calendar, SCOPES.calendarEvents, SCOPES.tasks]
 
 function GoogleCalendar({ onReset }) {
   const google = useGoogle()
@@ -292,6 +340,7 @@ function GoogleCalendar({ onReset }) {
   }
   if (loading) return <p className="empty-state">Loading your calendar…</p>
 
+  const taskUrl = (task) => `${TASKS_API}/lists/${encodeURIComponent(task.listId)}/tasks/${encodeURIComponent(task.taskId)}`
   const eventUrl = (event) =>
     `${CALENDAR_API}/calendars/${encodeURIComponent(event.calendarId)}/events/${encodeURIComponent(event.eventId)}`
 
@@ -323,8 +372,17 @@ function GoogleCalendar({ onReset }) {
           event={editing.event ?? null}
           start={editing.start}
           onClose={() => setEditing(null)}
-          onSave={async (body) => {
-            if (editing.event) await googleSend(eventUrl(editing.event), 'PATCH', body)
+          onSave={async ({ kind, ...body }) => {
+            if (kind === 'task') {
+              // Tasks need their own permission; the first time, Google asks for it.
+              if (!hasScope(google, SCOPES.tasks)) {
+                const granted = await connectGoogle(CALENDAR_SCOPES)
+                if (!hasScope(granted, SCOPES.tasks))
+                  throw new Error('To add tasks, leave the Google Tasks box checked on Google’s screen.')
+              }
+              if (editing.event) await googleSend(taskUrl(editing.event), 'PATCH', body)
+              else await googleSend(`${TASKS_API}/lists/@default/tasks`, 'POST', withoutEmpty(body))
+            } else if (editing.event) await googleSend(eventUrl(editing.event), 'PATCH', body)
             // A new event only needs the fields that are set (the empty ones clear
             // old values when editing).
             else await googleSend(`${CALENDAR_API}/calendars/primary/events`, 'POST', withoutEmpty(body))
@@ -333,7 +391,7 @@ function GoogleCalendar({ onReset }) {
           onDelete={
             editing.event
               ? async () => {
-                  await googleSend(eventUrl(editing.event), 'DELETE')
+                  await googleSend(editing.event.kind === 'task' ? taskUrl(editing.event) : eventUrl(editing.event), 'DELETE')
                   reload()
                 }
               : undefined

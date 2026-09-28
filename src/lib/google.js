@@ -21,6 +21,8 @@ export const SCOPES = {
   calendar: 'https://www.googleapis.com/auth/calendar.readonly',
   // Add, edit and delete events (not whole calendars or settings).
   calendarEvents: 'https://www.googleapis.com/auth/calendar.events',
+  // Google Tasks (the to-dos that also show in Google Calendar).
+  tasks: 'https://www.googleapis.com/auth/tasks',
   gmail: 'https://www.googleapis.com/auth/gmail.readonly',
 }
 

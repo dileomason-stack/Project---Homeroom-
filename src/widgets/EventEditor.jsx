@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-// The box for adding or changing a Google Calendar event: title, all-day,
-// date, start and end times, and place. `event` is an existing event (from
-// the Day view) or null for a new one starting at `start`. onSave gets the
-// Google Calendar API body; onDelete (existing events only) removes it.
+// The box for adding or changing a Google Calendar event (title, all-day,
+// date, start and end times, place) or a Google Tasks task (title, due date,
+// notes, done). `event` is an existing event or task from the Day view (a task
+// has kind: 'task'), or null for a new one starting at `start`, with an
+// Event / Task switch. onSave gets { kind: 'event', ...Calendar API body } or
+// { kind: 'task', ...Tasks API body }; onDelete (existing ones only) removes it.
 const pad = (n) => String(n).padStart(2, '0')
 const toDateInput = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 const toTimeInput = (date) => `${pad(date.getHours())}:${pad(date.getMinutes())}`
@@ -30,6 +32,10 @@ export default function EventEditor({ event, start, onSave, onDelete, onClose })
   const [startTime, setStartTime] = useState(toTimeInput(initialStart))
   const [endTime, setEndTime] = useState(toTimeInput(initialEnd ?? new Date(initialStart.getTime() + 3600000)))
   const [location, setLocation] = useState(event?.location ?? '')
+  const [kind, setKind] = useState(event?.kind === 'task' ? 'task' : 'event')
+  const [notes, setNotes] = useState(event?.notes ?? '')
+  const [done, setDone] = useState(Boolean(event?.completed))
+  const isTask = kind === 'task'
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -54,6 +60,19 @@ export default function EventEditor({ event, start, onSave, onDelete, onClose })
 
   function save(submit) {
     submit.preventDefault()
+    if (isTask) {
+      // Google Tasks keeps only the due date (not a time).
+      run(() =>
+        onSave({
+          kind: 'task',
+          title: title.trim() || '(No title)',
+          notes: notes.trim(),
+          due: `${date}T00:00:00.000Z`,
+          status: done ? 'completed' : 'needsAction',
+        }),
+      )
+      return
+    }
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
     let body
     if (allDay) {
@@ -69,13 +88,35 @@ export default function EventEditor({ event, start, onSave, onDelete, onClose })
     }
     body.summary = title.trim() || '(No title)'
     body.location = location.trim()
-    run(() => onSave(body))
+    run(() => onSave({ kind: 'event', ...body }))
   }
 
   return createPortal(
     <div className="event-layer" onMouseDown={(click) => click.target === click.currentTarget && onClose()}>
-      <form className="event-editor" role="dialog" aria-label={event ? 'Edit event' : 'New event'} onSubmit={save}>
-        <p className="event-editor-kicker">{event ? 'Edit event' : 'New event'} · Google Calendar</p>
+      <form className="event-editor" role="dialog" aria-label={`${event ? 'Edit' : 'New'} ${kind}`} onSubmit={save}>
+        {event ? (
+          <p className="event-editor-kicker">
+            Edit {kind} · {isTask ? 'Google Tasks' : 'Google Calendar'}
+          </p>
+        ) : (
+          <div className="segmented-tabs event-editor-kind" role="tablist" aria-label="Add an event or a task">
+            {[
+              ['event', 'Event'],
+              ['task', 'Task'],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={kind === key}
+                className={kind === key ? 'active' : undefined}
+                onClick={() => setKind(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <input
           className="event-editor-title"
           value={title}
@@ -84,12 +125,26 @@ export default function EventEditor({ event, start, onSave, onDelete, onClose })
           aria-label="Title"
           autoFocus
         />
-        <label className="event-editor-check">
-          <input type="checkbox" checked={allDay} onChange={(change) => setAllDay(change.target.checked)} /> All day
-        </label>
+        {isTask ? (
+          event && (
+            <label className="event-editor-check">
+              <input type="checkbox" checked={done} onChange={(change) => setDone(change.target.checked)} /> Done
+            </label>
+          )
+        ) : (
+          <label className="event-editor-check">
+            <input type="checkbox" checked={allDay} onChange={(change) => setAllDay(change.target.checked)} /> All day
+          </label>
+        )}
         <div className="event-editor-row">
-          <input type="date" value={date} onChange={(change) => setDate(change.target.value)} aria-label="Date" required />
-          {!allDay && (
+          <input
+            type="date"
+            value={date}
+            onChange={(change) => setDate(change.target.value)}
+            aria-label={isTask ? 'Due date' : 'Date'}
+            required
+          />
+          {!allDay && !isTask && (
             <>
               <input
                 type="time"
@@ -109,12 +164,22 @@ export default function EventEditor({ event, start, onSave, onDelete, onClose })
             </>
           )}
         </div>
-        <input
-          value={location}
-          onChange={(change) => setLocation(change.target.value)}
-          placeholder="Add location"
-          aria-label="Location"
-        />
+        {isTask ? (
+          <textarea
+            value={notes}
+            onChange={(change) => setNotes(change.target.value)}
+            placeholder="Add notes"
+            aria-label="Notes"
+            rows={2}
+          />
+        ) : (
+          <input
+            value={location}
+            onChange={(change) => setLocation(change.target.value)}
+            placeholder="Add location"
+            aria-label="Location"
+          />
+        )}
         {event?.recurring && (
           <p className="setup-note">This is one meeting of a repeating event; changes apply to this one only.</p>
         )}
