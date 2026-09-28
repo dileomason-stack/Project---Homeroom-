@@ -19,7 +19,7 @@ export default function LinkSetup({ heading, steps, placeholder, check, onSave, 
 
   return (
     <div className="link-setup">
-      <p className="link-setup-heading">{heading}</p>
+      {heading && <p className="link-setup-heading">{heading}</p>}
       {steps && (
         <ol className="link-setup-steps">
           {steps.map((step) => (

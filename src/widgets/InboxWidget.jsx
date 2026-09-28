@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { openExternal } from '../lib/openExternal.js'
-import { useStoreValue, widgetDataKey } from '../storage.js'
+import { googleFetch, hasScope, SCOPES, useGoogle } from '../lib/google.js'
+import { useLoader } from '../lib/useFetch.js'
+import { useStore, useStoreValue, widgetDataKey } from '../storage.js'
+import GoogleSignIn from './GoogleSignIn.jsx'
 
 // Gmail and Outlook can't be shown inside other sites, so this card offers
 // quick ways in: app-icon tiles that open them in a new tab, compose,
@@ -78,10 +81,111 @@ const SAMPLE_EMAILS = [
   },
 ]
 
+// Gmail's API returns snippets with HTML entities (&#39; and so on).
+function decodeEntities(text) {
+  const element = document.createElement('textarea')
+  element.innerHTML = text
+  return element.value
+}
+
+function shortTime(date) {
+  const now = new Date()
+  if (date.toDateString() === now.toDateString()) return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  if (now - date < 6 * 86400000) return date.toLocaleDateString([], { weekday: 'short' })
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+}
+
+// The newest emails in your inbox (read-only), plus the unread count.
+async function loadInbox(google) {
+  const base = 'https://gmail.googleapis.com/gmail/v1/users/me'
+  const [list, label] = await Promise.all([
+    googleFetch(`${base}/messages?labelIds=INBOX&maxResults=12`, google),
+    googleFetch(`${base}/labels/INBOX`, google),
+  ])
+  const messages = await Promise.all(
+    (list.messages ?? []).map((message) =>
+      googleFetch(
+        `${base}/messages/${message.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+        google,
+      ),
+    ),
+  )
+  const header = (message, name) => message.payload?.headers?.find((item) => item.name.toLowerCase() === name)?.value ?? ''
+  return {
+    unread: label.messagesUnread ?? 0,
+    emails: messages.map((message) => ({
+      id: message.id,
+      threadId: message.threadId,
+      from:
+        header(message, 'from')
+          .replace(/\s*<[^>]*>\s*$/, '')
+          .replace(/^"|"$/g, '') || '(unknown sender)',
+      subject: header(message, 'subject') || '(no subject)',
+      snippet: decodeEntities(message.snippet ?? ''),
+      time: shortTime(new Date(Number(message.internalDate))),
+      unread: message.labelIds?.includes('UNREAD'),
+    })),
+  }
+}
+
+function GmailInbox() {
+  const google = useGoogle()
+  const connected = hasScope(google, SCOPES.gmail)
+  const { data, error, loading, reload } = useLoader(
+    connected ? `gmail|${google.email}|${google.expiresAt}` : null,
+    () => loadInbox(google),
+    2 * 60 * 1000,
+  )
+  if (!connected) {
+    return (
+      <div className="inbox-connect">
+        <GoogleSignIn scopes={[SCOPES.gmail]} label="Show my Gmail inbox" />
+        <p className="setup-note">Read-only: Homeroom can see your newest emails but never send, delete or change anything.</p>
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="inbox-connect">
+        <p className="form-error">{error}</p>
+        <button type="button" onClick={reload}>
+          Try again
+        </button>
+      </div>
+    )
+  }
+  if (loading) return <p className="empty-state">Loading your inbox…</p>
+  const gmailLink = (threadId) =>
+    `https://mail.google.com/mail/?authuser=${encodeURIComponent(google.email ?? '')}#inbox/${threadId}`
+  return (
+    <>
+      <p className="inbox-count">
+        {data.unread ? `${data.unread} unread` : 'All caught up'} <span>· {google.email ?? 'your inbox'}</span>
+      </p>
+      <ul className="inbox-list">
+        {data.emails.map((email) => (
+          <li key={email.id}>
+            <button type="button" className={email.unread ? undefined : 'read'} onClick={() => open(gmailLink(email.threadId))}>
+              <span className="inbox-from">{email.from}</span>
+              <span className="inbox-time">{email.time}</span>
+              <span className="inbox-subject">{email.subject}</span>
+              <span className="inbox-snippet">{email.snippet}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
 export default function InboxWidget({ id }) {
   const [settings, setSettings] = useStoreValue(widgetDataKey(id), NO_SETTINGS, isSettings)
   const [query, setQuery] = useState('')
   const [explaining, setExplaining] = useState(false)
+  const store = useStore()
+  const google = useGoogle()
+  const showingGmail = !settings.sample && !store.example
+  const gmailConnected = showingGmail && hasScope(google, SCOPES.gmail)
   const read = settings.read ?? {}
   const unread = SAMPLE_EMAILS.filter((email) => !read[email.id]).length
 
@@ -123,19 +227,22 @@ export default function InboxWidget({ id }) {
           ✏️ Compose
         </button>
       </div>
-      <p className="mail-why">
-        🔒 Gmail and Outlook don’t let other websites show your inbox, so they open in a new tab instead.{' '}
-        <button
-          type="button"
-          className="mail-why-toggle"
-          onClick={() => setExplaining(!explaining)}
-          aria-expanded={explaining}
-          aria-label="Why can't my inbox show here?"
-          title="Why can't my inbox show here?"
-        >
-          ?
-        </button>
-      </p>
+      {!gmailConnected && (
+        <p className="mail-why">
+          🔒 Gmail’s and Outlook’s websites can’t be shown inside other sites, so they open in a new tab.{' '}
+          {showingGmail && 'Sign in below to see your Gmail inbox here. '}
+          <button
+            type="button"
+            className="mail-why-toggle"
+            onClick={() => setExplaining(!explaining)}
+            aria-expanded={explaining}
+            aria-label="Why can't my inbox show here?"
+            title="Why can't my inbox show here?"
+          >
+            ?
+          </button>
+        </p>
+      )}
       {explaining && (
         <div className="mail-explain">
           <p>
@@ -143,20 +250,19 @@ export default function InboxWidget({ id }) {
             signed in. It’s a security rule, so no page can quietly load your email.
           </p>
           <p>
-            <strong>Could it show my real inbox?</strong> Yes, with “Sign in with Google” or Microsoft and their official email
-            APIs:
+            <strong>So how does my inbox show?</strong> Through “Sign in with Google” and Gmail’s official email API, read-only:
           </p>
           <ul>
             <li>
-              <b>Gmail:</b> Google treats reading email as a restricted permission. An app needs Google’s verification and an
-              independent security review before the public can use it.
+              <b>Gmail:</b> works now for accounts on Homeroom’s test list. Google treats reading email as a restricted
+              permission, so opening it to everyone needs Google’s verification and an independent security review.
             </li>
             <li>
               <b>Outlook:</b> the app is registered with Microsoft, and for school accounts like Cal Poly’s, the school’s IT may
               need to approve it.
             </li>
           </ul>
-          <p>That’s the plan for after Build Day. Until then, the emails below are a made-up sample.</p>
+          <p>Outlook sign-in is next on the list.</p>
         </div>
       )}
       <form className="inline-form" onSubmit={search}>
@@ -191,6 +297,8 @@ export default function InboxWidget({ id }) {
             ))}
           </ul>
         </>
+      ) : showingGmail ? (
+        <GmailInbox />
       ) : null}
     </div>
   )

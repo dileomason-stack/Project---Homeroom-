@@ -5,10 +5,14 @@ import { checkGoogleIcsUrl, looksLikeGoogleIcs } from '../lib/gcalFeed.js'
 import { formatTime } from '../lib/dates.js'
 import { useLoader } from '../lib/useFetch.js'
 import { useStore, useStoreValue, widgetDataKey } from '../storage.js'
+import { disconnectGoogle, googleFetch, hasScope, SCOPES, useGoogle } from '../lib/google.js'
 import DayView from './DayView.jsx'
+import GoogleSignIn from './GoogleSignIn.jsx'
 import LinkSetup from './LinkSetup.jsx'
 
 // Settings, one of:
+//   { google: true } your Google Calendar via Sign in with Google → Day view
+//                    with your real events and colors
 //   { icsUrl }   a calendar's secret iCal address → our own Day view
 //   { embedUrl } Google's embeddable calendar (from an email or embed code)
 //   { sample: true } Alex's made-up week, in the Day view
@@ -166,6 +170,103 @@ function EmbedCalendar({ embedUrl, view, onView, zoom, onZoom }) {
   )
 }
 
+// Your calendars (the ones checked in Google Calendar) from two weeks ago to
+// two months ahead, in the Day view's format, with Google's own colors.
+async function loadGoogleCalendar(google) {
+  const base = 'https://www.googleapis.com/calendar/v3'
+  const [palette, list] = await Promise.all([
+    googleFetch(`${base}/colors`, google),
+    googleFetch(`${base}/users/me/calendarList`, google),
+  ])
+  const calendars = (list.items ?? []).filter((calendar) => calendar.selected || calendar.primary)
+  const from = new Date(Date.now() - 14 * 86400000).toISOString()
+  const to = new Date(Date.now() + 62 * 86400000).toISOString()
+  const perCalendar = await Promise.all(
+    calendars.map((calendar) =>
+      googleFetch(
+        `${base}/calendars/${encodeURIComponent(calendar.id)}/events?singleEvents=true&orderBy=startTime&maxResults=500&timeMin=${from}&timeMax=${to}`,
+        google,
+      )
+        .then((result) => ({ calendar, items: result.items ?? [] }))
+        .catch(() => ({ calendar, items: [] })),
+    ),
+  )
+  const events = perCalendar.flatMap(({ calendar, items }) =>
+    items
+      .filter(
+        (event) =>
+          event.status !== 'cancelled' && !event.attendees?.some((person) => person.self && person.responseStatus === 'declined'),
+      )
+      .map((event) => {
+        const color = palette.event?.[event.colorId]
+        return {
+          id: `${calendar.id}-${event.id}`,
+          title: event.summary || '(No title)',
+          location: event.location ?? '',
+          allDay: Boolean(event.start?.date),
+          start: event.start?.date ?? event.start?.dateTime,
+          end: event.end?.date ?? event.end?.dateTime,
+          color: color?.background ?? calendar.backgroundColor,
+          textColor: color?.foreground ?? calendar.foregroundColor,
+        }
+      }),
+  )
+  return { events, fetchedAt: new Date().toISOString() }
+}
+
+function GoogleCalendar({ onReset }) {
+  const google = useGoogle()
+  const connected = hasScope(google, SCOPES.calendar)
+  const { data, error, loading, reload } = useLoader(
+    connected ? `gcal|${google.email}|${google.expiresAt}` : null,
+    () => loadGoogleCalendar(google),
+    5 * 60 * 1000,
+  )
+
+  if (!connected) {
+    return (
+      <div className="widget-message">
+        <p>Reconnect to see your Google Calendar (the connection lasts about an hour, in this tab).</p>
+        <GoogleSignIn scopes={[SCOPES.calendar]} label="Reconnect Google Calendar" />
+        <button type="button" className="link-button" onClick={onReset}>
+          Use a different way
+        </button>
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="widget-message">
+        <p className="form-error">{error}</p>
+        <button type="button" onClick={reload}>
+          Try again
+        </button>
+      </div>
+    )
+  }
+  if (loading) return <p className="empty-state">Loading your calendar…</p>
+  return (
+    <DayView
+      events={data.events}
+      footer={
+        <p className="dayview-footer">
+          {google.email ? `${google.email} · ` : ''}Updated {formatTime(new Date(data.fetchedAt))} ·{' '}
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => {
+              disconnectGoogle()
+              onReset()
+            }}
+          >
+            Sign out
+          </button>
+        </p>
+      }
+    />
+  )
+}
+
 function SampleCalendar() {
   const events = useMemo(() => sampleEvents(), [])
   return <DayView events={events} />
@@ -214,29 +315,42 @@ export default function CalendarWidget({ id }) {
     )
   }
 
+  if (settings.google) return <GoogleCalendar onReset={() => setSettings({})} />
   if (settings.icsUrl) return <FeedCalendar icsUrl={settings.icsUrl} onReset={() => setSettings({})} />
 
   const embed = settings.embedUrl ? toCalendarEmbed(settings.embedUrl) : null
   if (!embed?.ok) {
     return (
-      <LinkSetup
-        heading="Show your Google Calendar here."
-        steps={['Type the email address you use for Google Calendar (like you@gmail.com or your school email)', 'Click Save']}
-        placeholder="you@gmail.com"
-        check={checkCalendarInput}
-        onSave={(result) => setSettings(result.icsUrl ? { icsUrl: result.icsUrl } : { embedUrl: result.embedUrl })}
-        extra={
+      <div className="calendar-setup">
+        {!store.example && (
           <>
+            <p className="link-setup-heading">Show your Google Calendar here.</p>
+            <GoogleSignIn scopes={[SCOPES.calendar]} onConnected={() => setSettings({ google: true })} />
             <p className="setup-note">
-              Your events show in browsers where you’re signed in to that Google account. You can switch between Day, Week, Month
-              and List. For a shared or club calendar, paste its Calendar ID or embed code instead.
+              Your real events and colors in a Day view. Read-only: Homeroom can’t change your calendar.
             </p>
-            <button type="button" className="link-button" onClick={() => setSettings({ sample: true })}>
-              Or show a sample week
-            </button>
+            <p className="setup-or">or, without signing in:</p>
           </>
-        }
-      />
+        )}
+        <LinkSetup
+          heading={store.example ? 'Show your Google Calendar here.' : ''}
+          steps={['Type the email address you use for Google Calendar (like you@gmail.com or your school email)', 'Click Save']}
+          placeholder="you@gmail.com"
+          check={checkCalendarInput}
+          onSave={(result) => setSettings(result.icsUrl ? { icsUrl: result.icsUrl } : { embedUrl: result.embedUrl })}
+          extra={
+            <>
+              <p className="setup-note">
+                Your events show in browsers where you’re signed in to that Google account. You can switch between Day, Week,
+                Month and List. For a shared or club calendar, paste its Calendar ID or embed code instead.
+              </p>
+              <button type="button" className="link-button" onClick={() => setSettings({ sample: true })}>
+                Or show a sample week
+              </button>
+            </>
+          }
+        />
+      </div>
     )
   }
 

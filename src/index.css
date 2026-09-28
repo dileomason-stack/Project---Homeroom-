@@ -1251,7 +1251,7 @@ a.canvas-title:hover {
   padding: 2px 8px;
   border-radius: 6px;
   background: var(--event);
-  color: #fff;
+  color: var(--event-text, #fff);
   font-size: 0.8rem;
   font-weight: 500;
   white-space: nowrap;
@@ -1304,7 +1304,7 @@ a.canvas-title:hover {
   border: 1px solid var(--card-bg, var(--page));
   border-radius: 6px;
   background: var(--event);
-  color: #fff;
+  color: var(--event-text, #fff);
   font-size: 0.78rem;
   line-height: 1.25;
 }
@@ -4168,6 +4168,7 @@ a.canvas-title:hover {
 @container (max-height: 230px) {
   .inbox .mail-why,
   .inbox .mail-explain,
+  .inbox .inbox-connect,
   .inbox .inline-form,
   .inbox .inbox-count,
   .inbox .inbox-list {
@@ -4384,4 +4385,56 @@ a.canvas-title:hover {
   background: transparent;
   color: var(--text-muted);
   font-size: 1rem;
+}
+
+/* ---------- Sign in with Google ---------- */
+
+.google-signin {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.google-signin-button {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 14px 0 12px;
+  border: 1px solid #dadce0;
+  border-radius: 20px;
+  background: #fff;
+  color: #1f1f1f;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.google-signin-button:hover:not(:disabled) {
+  background: #f7f8f8;
+  border-color: #d2e3fc;
+}
+
+.google-signin-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.calendar-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setup-or {
+  margin: 4px 0 -4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.inbox-connect {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }

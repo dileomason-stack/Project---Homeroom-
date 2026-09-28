@@ -5,13 +5,17 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 // colored block (side by side when they overlap) and a red line at the
 // current time. ‹ › step through days.
 //
-// events: [{ id, title, location, allDay, start, end }] where timed events use
-// ISO instants and all-day events use 'YYYY-MM-DD' dates (end = the day after).
+// events: [{ id, title, location, allDay, start, end, color?, textColor? }]
+// where timed events use ISO instants and all-day events use 'YYYY-MM-DD'
+// dates (end = the day after). Without a color, each title gets its own.
 
 const HOUR_HEIGHT = 48
 const DAY_MS = 24 * 60 * 60 * 1000
 // Google Calendar's event colors; each event title always gets the same one.
 const COLORS = ['#7cb342', '#0b8043', '#039be5', '#3f51b5', '#8e24aa', '#e67c73', '#f4511e', '#33b679']
+
+// The event's own colors (from Google Calendar), or one picked by title.
+const eventColors = (event) => ({ '--event': event.color ?? colorFor(event.title), '--event-text': event.textColor ?? '#fff' })
 
 function colorFor(title) {
   let hash = 0
@@ -129,7 +133,7 @@ export default function DayView({ events, footer }) {
       {allDay.length > 0 && (
         <ul className="dayview-allday">
           {allDay.map((event) => (
-            <li key={event.id} style={{ '--event': colorFor(event.title) }}>
+            <li key={event.id} style={eventColors(event)}>
               {event.title}
             </li>
           ))}
@@ -157,7 +161,7 @@ export default function DayView({ events, footer }) {
                 key={event.id}
                 className={`dayview-event${short ? ' short' : ''}`}
                 style={{
-                  '--event': colorFor(event.title),
+                  ...eventColors(event),
                   top: (top / (60 * 60 * 1000)) * HOUR_HEIGHT,
                   height: Math.max(height - 2, 16),
                   left: `calc(var(--gutter) + (100% - var(--gutter)) * ${column / columns})`,
