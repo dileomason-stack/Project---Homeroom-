@@ -8,7 +8,6 @@ import { useStore, useStoreValue, widgetDataKey } from '../storage.js'
 import { disconnectGoogle, googleFetch, hasScope, SCOPES, useGoogle } from '../lib/google.js'
 import DayView from './DayView.jsx'
 import GoogleSignIn from './GoogleSignIn.jsx'
-import LinkSetup from './LinkSetup.jsx'
 
 // Settings, one of:
 //   { google: true } your Google Calendar via Sign in with Google → Day view
@@ -267,6 +266,79 @@ function GoogleCalendar({ onReset }) {
   )
 }
 
+// The setup screen: Sign in with Google (best), or just type an email for
+// Google's own embedded calendar, or a sample week. Details are behind ⓘ.
+function CalendarSetup({ canSignIn, onGoogle, onSave, onSample }) {
+  const [text, setText] = useState('')
+  const [error, setError] = useState('')
+  const [details, setDetails] = useState(false)
+
+  function save(event) {
+    event.preventDefault()
+    const result = checkCalendarInput(text)
+    if (!result.ok) return setError(result.error)
+    onSave(result)
+  }
+
+  return (
+    <div className="calendar-setup">
+      <p className="calendar-setup-title">📅 Connect your calendar</p>
+      {canSignIn && (
+        <>
+          <div className="calendar-setup-google">
+            <GoogleSignIn scopes={[SCOPES.calendar]} onConnected={onGoogle} />
+            <p className="setup-note">Your real events and colors · read-only</p>
+          </div>
+          <p className="setup-divider">
+            <span>or</span>
+          </p>
+        </>
+      )}
+      <form className="calendar-setup-email" onSubmit={save}>
+        <input
+          type="text"
+          value={text}
+          onChange={(event) => {
+            setText(event.target.value)
+            setError('')
+          }}
+          placeholder="Your Google email"
+          aria-label="Your Google email"
+          autoComplete="email"
+          spellCheck={false}
+        />
+        <button type="submit" disabled={!text.trim()}>
+          Use
+        </button>
+        <button
+          type="button"
+          className="calendar-setup-info"
+          onClick={() => setDetails(!details)}
+          aria-expanded={details}
+          aria-label="How the email option works"
+          title="How the email option works"
+        >
+          ⓘ
+        </button>
+      </form>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      {details && (
+        <p className="setup-note calendar-setup-details">
+          Shows Google’s own calendar (Day, Week, Month or List) in browsers where you’re signed in to that account; no sign-in to
+          Homeroom needed. For a shared or club calendar, paste its Calendar ID or embed code.
+        </p>
+      )}
+      <button type="button" className="link-button calendar-setup-sample" onClick={onSample}>
+        Show a sample week
+      </button>
+    </div>
+  )
+}
+
 function SampleCalendar() {
   const events = useMemo(() => sampleEvents(), [])
   return <DayView events={events} />
@@ -321,36 +393,12 @@ export default function CalendarWidget({ id }) {
   const embed = settings.embedUrl ? toCalendarEmbed(settings.embedUrl) : null
   if (!embed?.ok) {
     return (
-      <div className="calendar-setup">
-        {!store.example && (
-          <>
-            <p className="link-setup-heading">Show your Google Calendar here.</p>
-            <GoogleSignIn scopes={[SCOPES.calendar]} onConnected={() => setSettings({ google: true })} />
-            <p className="setup-note">
-              Your real events and colors in a Day view. Read-only: Homeroom can’t change your calendar.
-            </p>
-            <p className="setup-or">or, without signing in:</p>
-          </>
-        )}
-        <LinkSetup
-          heading={store.example ? 'Show your Google Calendar here.' : ''}
-          steps={['Type the email address you use for Google Calendar (like you@gmail.com or your school email)', 'Click Save']}
-          placeholder="you@gmail.com"
-          check={checkCalendarInput}
-          onSave={(result) => setSettings(result.icsUrl ? { icsUrl: result.icsUrl } : { embedUrl: result.embedUrl })}
-          extra={
-            <>
-              <p className="setup-note">
-                Your events show in browsers where you’re signed in to that Google account. You can switch between Day, Week,
-                Month and List. For a shared or club calendar, paste its Calendar ID or embed code instead.
-              </p>
-              <button type="button" className="link-button" onClick={() => setSettings({ sample: true })}>
-                Or show a sample week
-              </button>
-            </>
-          }
-        />
-      </div>
+      <CalendarSetup
+        canSignIn={!store.example}
+        onGoogle={() => setSettings({ google: true })}
+        onSave={(result) => setSettings(result.icsUrl ? { icsUrl: result.icsUrl } : { embedUrl: result.embedUrl })}
+        onSample={() => setSettings({ sample: true })}
+      />
     )
   }
 

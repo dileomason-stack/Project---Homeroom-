@@ -4438,3 +4438,83 @@ a.canvas-title:hover {
   flex-direction: column;
   gap: 6px;
 }
+
+/* Calendar setup: one clear choice at a time. */
+.calendar-setup {
+  height: 100%;
+  justify-content: center;
+  gap: 10px;
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+.calendar-setup-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.calendar-setup-google {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.calendar-setup-google .google-signin,
+.calendar-setup-google .google-signin-button {
+  align-self: stretch;
+  justify-content: center;
+}
+
+.calendar-setup-google .setup-note {
+  margin: 0;
+  text-align: center;
+}
+
+.setup-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.setup-divider::before,
+.setup-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.calendar-setup-email {
+  display: flex;
+  gap: 6px;
+}
+
+.calendar-setup-email input {
+  flex: 1;
+  min-width: 0;
+}
+
+.calendar-setup-info {
+  flex: none;
+  width: 34px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+.calendar-setup-details {
+  margin: 0;
+}
+
+.calendar-setup-sample {
+  align-self: center;
+  font-size: 0.85rem;
+}
