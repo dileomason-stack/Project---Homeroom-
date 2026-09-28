@@ -81,7 +81,20 @@ export default function Workspace({
   // card wins any overlap.
   const [compactor] = useState(createPushDownCompactor)
   const setActive = (current, item) => compactor.setActive(item?.i ?? null, current)
-  const clearActive = () => compactor.setActive(null)
+  // While a card is dragged or resized, embedded sites (a Spotify player right
+  // under the grab bar, a whiteboard next to it...) stop catching the mouse,
+  // so every movement and the release reach the grid (CSS: .card-dragging).
+  // Otherwise the pointer slipping onto a player mid-drag loses the drag.
+  const startDragging = (current, item) => {
+    setActive(current, item)
+    document.documentElement.classList.add('card-dragging')
+    window.addEventListener('pointerup', stopDragging, { once: true, capture: true })
+  }
+  const stopDragging = () => document.documentElement.classList.remove('card-dragging')
+  const clearActive = () => {
+    compactor.setActive(null)
+    stopDragging()
+  }
 
   // The grid cell under a point on screen.
   function cellAt(event) {
@@ -207,8 +220,8 @@ export default function Workspace({
           dragConfig={{ cancel: `${NOT_DRAGGABLE}, .widget-control` }}
           resizeConfig={{ handles: ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] }}
           compactor={compactor}
-          onDragStart={setActive}
-          onResizeStart={setActive}
+          onDragStart={startDragging}
+          onResizeStart={startDragging}
           onDrag={(_layout, oldItem, _newItem, _placeholder, event) =>
             compactor.setOutside(Boolean(onCardDrag?.(oldItem?.i, event)))
           }
