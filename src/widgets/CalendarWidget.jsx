@@ -5,7 +5,16 @@ import { checkGoogleIcsUrl, looksLikeGoogleIcs } from '../lib/gcalFeed.js'
 import { formatTime } from '../lib/dates.js'
 import { useLoader } from '../lib/useFetch.js'
 import { useStore, useStoreValue, widgetDataKey } from '../storage.js'
-import { connectGoogle, disconnectGoogle, googleFetch, googleSend, hasScope, SCOPES, useGoogle } from '../lib/google.js'
+import {
+  connectGoogle,
+  disconnectGoogle,
+  googleFetch,
+  googleSend,
+  hasScope,
+  preloadGoogle,
+  SCOPES,
+  useGoogle,
+} from '../lib/google.js'
 import DayView from './DayView.jsx'
 import EventEditor from './EventEditor.jsx'
 import GoogleSignIn from './GoogleSignIn.jsx'
@@ -230,6 +239,30 @@ function GoogleCalendar({ onReset }) {
   const canEdit = hasScope(google, SCOPES.calendarEvents)
   // { event } to edit one, { start } for a new one, or null.
   const [editing, setEditing] = useState(null)
+  const [askError, setAskError] = useState('')
+  useEffect(() => {
+    preloadGoogle()
+  }, [])
+
+  // Editing is part of signing in. If this connection doesn't have it yet
+  // (signed in before editing existed, or the box was unticked), the first
+  // click to add or change an event asks Google for it, then opens the box.
+  async function edit(next) {
+    setAskError('')
+    if (!canEdit) {
+      try {
+        const granted = await connectGoogle(CALENDAR_SCOPES)
+        if (!hasScope(granted, SCOPES.calendarEvents)) {
+          setAskError('To add or change events, leave the “edit events” box checked on Google’s screen.')
+          return
+        }
+      } catch (problem) {
+        setAskError(problem.message)
+        return
+      }
+    }
+    setEditing(next)
+  }
   const { data, error, loading, reload } = useLoader(
     connected ? `gcal|${google.email}|${google.expiresAt}` : null,
     () => loadGoogleCalendar(google),
@@ -266,19 +299,12 @@ function GoogleCalendar({ onReset }) {
     <>
       <DayView
         events={data.events}
-        onNewEvent={canEdit ? (start) => setEditing({ start }) : undefined}
-        onEventClick={canEdit ? (event) => event.editable && setEditing({ event }) : undefined}
+        onNewEvent={(start) => edit({ start })}
+        onEventClick={(event) => event.editable && edit({ event })}
         footer={
           <p className="dayview-footer">
+            {askError && <span className="form-error">{askError} </span>}
             {google.email ? `${google.email} · ` : ''}Updated {formatTime(new Date(data.fetchedAt))} ·{' '}
-            {!canEdit && (
-              <>
-                <button type="button" className="link-button" onClick={() => connectGoogle(CALENDAR_SCOPES).catch(() => {})}>
-                  ✏️ Turn on editing
-                </button>
-                {' · '}
-              </>
-            )}
             <button
               type="button"
               className="link-button"

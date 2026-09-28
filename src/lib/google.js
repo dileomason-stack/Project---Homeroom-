@@ -58,6 +58,10 @@ export function useGoogle() {
 export const hasScope = (google, scope) => Boolean(google?.scopes?.includes(scope))
 
 let scriptPromise = null
+// Load Google's sign-in library ahead of time, so a later click can open its
+// pop-up right away (browsers only allow pop-ups straight after a click).
+export const preloadGoogle = () => loadScript().catch(() => {})
+
 function loadScript() {
   scriptPromise ??= new Promise((resolve, reject) => {
     const script = document.createElement('script')
