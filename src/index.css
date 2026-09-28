@@ -4356,3 +4356,32 @@ a.canvas-title:hover {
   font-weight: 600;
   color: var(--text);
 }
+
+/* Toolbar: "+ Add widget" plus a ⋯ menu for the rest. */
+.toolbar-more {
+  align-self: stretch;
+  width: 38px;
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* The example banner folds to one short line. */
+.example-banner.collapsed {
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+.example-banner.collapsed .example-banner-actions button {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+.example-banner-toggle {
+  width: 30px;
+  padding: 0 !important;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+}

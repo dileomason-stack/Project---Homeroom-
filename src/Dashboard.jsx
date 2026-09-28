@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import AddWidgetMenu from './AddWidgetMenu.jsx'
 import CollapsedCard from './CollapsedCard.jsx'
+import ContextMenu from './ContextMenu.jsx'
 import ColorPicker from './ColorPicker.jsx'
 import GuidePanel from './GuidePanel.jsx'
 import ShareDialog from './ShareDialog.jsx'
@@ -14,11 +15,13 @@ import { droppedLink, isLinkDrag } from './lib/drag.js'
 import { showToast } from './lib/toast.js'
 import { newId } from './lib/id.js'
 import Sidebar from './Sidebar.jsx'
-import { useStore, useStoreValue, widgetDataKey } from './storage.js'
+import { readJSON, useStore, useStoreValue, widgetDataKey, writeJSON } from './storage.js'
 import WidgetCard from './WidgetCard.jsx'
 import WidgetFrame from './WidgetFrame.jsx'
 import { OWN_DEFAULT_LAYOUT, tabOf, WIDGETS } from './widgets/registry.js'
 import Workspace from './Workspace.jsx'
+
+const TIPS_KEY = 'dashboard:exampleTipsHidden'
 
 // Below this width the page switches to a single scrolling column.
 const STACK_BELOW = 700
@@ -142,6 +145,15 @@ export default function Dashboard({ layoutKey, tabs, hasOwn, onBuildOwn, onViewE
   const [colorScope, setColorScope] = useState('sidebar')
   const [sharing, setSharing] = useState(false)
   const [guideOpen, setGuideOpen] = useState(false)
+  // The toolbar's ⋯ menu, and whether the example banner is folded to one line
+  // (remembered in this browser).
+  const [moreMenu, setMoreMenu] = useState(null)
+  const closeMoreMenu = useCallback(() => setMoreMenu(null), [])
+  const [tipsHidden, setTipsHiddenState] = useState(() => readJSON(TIPS_KEY, false) === true)
+  const setTipsHidden = (hidden) => {
+    setTipsHiddenState(hidden)
+    writeJSON(TIPS_KEY, hidden)
+  }
   // While a workspace card is dragged over the sidebar: where it would go
   // (an index in the sidebar list), else null.
   const [sidebarDrop, setSidebarDrop] = useState(null)
@@ -659,39 +671,64 @@ export default function Dashboard({ layoutKey, tabs, hasOwn, onBuildOwn, onViewE
           <h1>Homeroom</h1>
           {tabs}
         </div>
+        {/* Just "+ Add widget" and a ⋯ menu for everything else, so the
+            dashboard gets the screen. */}
         <div className="toolbar-actions">
-          <button type="button" onClick={() => setGuideOpen(true)} title="How to use Homeroom, and features you might miss">
-            ❓ Guide
-          </button>
-          <button type="button" onClick={() => setSharing(true)} title="Show a QR code and link to this site">
-            📱 Share
-          </button>
           <AddWidgetMenu onAdd={addWidget} onAddLink={(link) => dropLink(link, null)} />
-          <button type="button" onClick={resetLayout}>
-            {store.example ? 'Reset' : 'Clear all'}
+          <button
+            type="button"
+            className="toolbar-more"
+            aria-label="More"
+            aria-haspopup="menu"
+            title="Guide, share, example and more"
+            onClick={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect()
+              setMoreMenu({ x: rect.right - 200, y: rect.bottom + 6 })
+            }}
+          >
+            ⋯
           </button>
-          {!store.example && (
-            <button type="button" className="example-button" onClick={onViewExample} title="A sample dashboard showing what Homeroom can do">
-              👀 See an example
-            </button>
+          {moreMenu && (
+            <ContextMenu
+              x={moreMenu.x}
+              y={moreMenu.y}
+              onClose={closeMoreMenu}
+              items={[
+                !store.example && { label: '👀 See an example', onSelect: onViewExample },
+                store.example && { label: '← Back to my dashboard', onSelect: onBuildOwn },
+                { label: '❓ Guide', onSelect: () => setGuideOpen(true) },
+                { label: '📱 Share', onSelect: () => setSharing(true) },
+                store.example
+                  ? { label: '↺ Reset example', onSelect: resetLayout }
+                  : { label: 'Clear all', danger: true, onSelect: resetLayout },
+              ].filter(Boolean)}
+            />
           )}
         </div>
       </header>
 
       {store.example && (
-        <div className="example-banner" role="note">
+        <div className={`example-banner${tipsHidden ? ' collapsed' : ''}`} role="note">
           <div className="example-banner-text">
-            <p>
-              <strong>👋 This is a sample dashboard</strong> for {EXAMPLE_PERSON}, a fictional Cal Poly student. It all
-              resets when you reload.
-            </p>
-            <ul className="example-tips" aria-label="Things to try">
-              <li>Switch dashboards with the tabs above</li>
-              <li>Drag any card to move it</li>
-              <li>Right-click a card for options</li>
-              <li>🎨 Colors → Match Spotify</li>
-              <li>Paste any link (⌘V) to add it as a card</li>
-            </ul>
+            {tipsHidden ? (
+              <p>
+                <strong>👋 Sample dashboard</strong> for {EXAMPLE_PERSON}
+              </p>
+            ) : (
+              <p>
+                <strong>👋 This is a sample dashboard</strong> for {EXAMPLE_PERSON}, a fictional Cal Poly student. It all
+                resets when you reload.
+              </p>
+            )}
+            {!tipsHidden && (
+              <ul className="example-tips" aria-label="Things to try">
+                <li>Switch dashboards with the tabs above</li>
+                <li>Drag any card to move it</li>
+                <li>Right-click a card for options</li>
+                <li>🎨 Colors → Match Spotify</li>
+                <li>Paste any link (⌘V) to add it as a card</li>
+              </ul>
+            )}
           </div>
           <div className="example-banner-actions">
             {onCopyTab && (
@@ -701,6 +738,15 @@ export default function Dashboard({ layoutKey, tabs, hasOwn, onBuildOwn, onViewE
             )}
             <button type="button" className="primary" onClick={onBuildOwn}>
               {hasOwn ? 'Back to my dashboard →' : 'Build your own →'}
+            </button>
+            <button
+              type="button"
+              className="example-banner-toggle"
+              onClick={() => setTipsHidden(!tipsHidden)}
+              aria-label={tipsHidden ? 'Show tips' : 'Hide tips'}
+              title={tipsHidden ? 'Show tips' : 'Hide tips'}
+            >
+              {tipsHidden ? '⌄' : '⌃'}
             </button>
           </div>
         </div>

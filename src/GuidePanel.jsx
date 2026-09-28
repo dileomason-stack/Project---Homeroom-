@@ -8,7 +8,7 @@ const SECTIONS = [
     title: 'Getting started',
     items: [
       ['Your dashboard', 'Homeroom opens on your own dashboard, saved in this browser. Add cards with “+ Add widget”.'],
-      ['See an example', 'Click “👀 See an example” for Alex’s sample dashboards, a quick tour of what Homeroom can do. They reset every time you reload.'],
+      ['See an example', 'Open the ⋯ menu (top right) → “👀 See an example” for Alex’s sample dashboards, a quick tour of what Homeroom can do. They reset every time you reload.'],
       ['Copy a tab you like', 'In the example, click “⧉ Copy this tab” (or right-click a tab → Copy to my dashboards). On a blank dashboard, “🎮 Add the Games tab” adds the arcade in one click.'],
     ],
   },
@@ -55,7 +55,7 @@ const SECTIONS = [
     items: [
       ['🎨 Colors', 'Light or dark, color the sidebar or every card, use each app’s own colors, or match your Spotify playlist.'],
       ['Dashboard tabs', 'Click + for a new dashboard from a template. Right-click a tab to rename or delete it.'],
-      ['📱 Share', 'Shows a QR code so friends can open Homeroom on their phones.'],
+      ['📱 Share (in the ⋯ menu)', 'Shows a QR code so friends can open Homeroom on their phones.'],
     ],
   },
   {
