@@ -564,6 +564,7 @@ export default function Dashboard({ layoutKey, tabs, hasOwn, onBuildOwn, onViewE
           getSpotifyEmbedUrl={getSpotifyEmbedUrl}
           appColor={WIDGETS[widget.type].brandColor}
           use={WIDGETS[widget.type].use}
+          useFor={WIDGETS[widget.type].useFor}
           highlight={widget.id === newestId}
           onCollapse={isMaximized ? undefined : () => collapseWidget(widget.id, tab.title)}
           {...(area === 'sidebar' && !isMaximized ? dragProps : {})}

@@ -3,7 +3,7 @@ import ColorPicker from './ColorPicker.jsx'
 import ContextMenu from './ContextMenu.jsx'
 import { isDark, isValidHex } from './lib/colors.js'
 import { NOT_DRAGGABLE } from './lib/drag.js'
-import { useStoreValue } from './storage.js'
+import { useStoreValue, widgetDataKey } from './storage.js'
 import UseBadge from './UseBadge.jsx'
 
 const NO_STYLE = {}
@@ -30,6 +30,7 @@ export default function WidgetCard({
   getSpotifyEmbedUrl,
   appColor,
   use,
+  useFor,
   highlight,
   onCollapse,
   onDragStart,
@@ -42,6 +43,9 @@ export default function WidgetCard({
   const [armed, setArmed] = useState(false)
   const [picker, setPicker] = useState(null)
   const [style, setStyle] = useStoreValue(`style:${widgetId}`, NO_STYLE, isStyle)
+  // The badge can depend on the card's settings (see useFor in registry.js).
+  const [settings] = useStoreValue(widgetDataKey(widgetId), null)
+  const badge = useFor?.(settings) ?? use
   const closeMenu = useCallback(() => setMenu(null), [])
   const closePicker = useCallback(() => setPicker(null), [])
 
@@ -95,7 +99,7 @@ export default function WidgetCard({
             {title}
           </span>
         )}
-        <UseBadge use={use} />
+        <UseBadge use={badge} />
         <div className="card-handle">
           <span className="card-grip" aria-hidden="true">
             ⠿
