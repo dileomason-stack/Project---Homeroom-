@@ -284,6 +284,8 @@ for (const [use, types] of Object.entries(USE)) for (const type of types) WIDGET
 // you signed in to (add and edit events) works right in the card; one shown
 // by email, a feed or a sample is a preview.
 WIDGETS.calendar.useFor = (settings) => (settings?.google ? 'live' : 'preview')
+// Mail showing your real inbox is a preview; otherwise it's shortcuts.
+WIDGETS.inbox.useFor = (settings) => (settings?.gmail ? 'preview' : 'jump')
 
 // A card's tab info: the type's, adjusted by tabFor for that card's settings.
 export function tabOf(widget, settings) {

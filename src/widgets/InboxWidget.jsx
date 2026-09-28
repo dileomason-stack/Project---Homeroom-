@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { openExternal } from '../lib/openExternal.js'
 import { googleFetch, hasScope, SCOPES, useGoogle } from '../lib/google.js'
 import { useLoader } from '../lib/useFetch.js'
@@ -128,7 +128,9 @@ async function loadInbox(google) {
   }
 }
 
-function GmailInbox() {
+// compose: a small button shown on the unread line (when the inbox is the
+// whole card).
+function GmailInbox({ compose }) {
   const google = useGoogle()
   const connected = hasScope(google, SCOPES.gmail)
   const { data, error, loading, reload } = useLoader(
@@ -159,9 +161,12 @@ function GmailInbox() {
     `https://mail.google.com/mail/?authuser=${encodeURIComponent(google.email ?? '')}#inbox/${threadId}`
   return (
     <>
-      <p className="inbox-count">
-        {data.unread ? `${data.unread} unread` : 'All caught up'} <span>· {google.email ?? 'your inbox'}</span>
-      </p>
+      <div className="inbox-head">
+        <p className="inbox-count">
+          {data.unread ? `${data.unread} unread` : 'All caught up'} <span>· {google.email ?? 'your inbox'}</span>
+        </p>
+        {compose}
+      </div>
       <ul className="inbox-list">
         {data.emails.map((email) => (
           <li key={email.id}>
@@ -188,6 +193,35 @@ export default function InboxWidget({ id }) {
   const gmailConnected = showingGmail && hasScope(google, SCOPES.gmail)
   const read = settings.read ?? {}
   const unread = SAMPLE_EMAILS.filter((email) => !read[email.id]).length
+
+  // With your Gmail connected, the card is just your inbox and a small
+  // compose button (the app tiles and search come back if you sign out).
+  // The flag also sets the card's badge (see useFor in registry.js).
+  useEffect(() => {
+    if (gmailConnected !== Boolean(settings.gmail)) setSettings((current) => ({ ...current, gmail: gmailConnected }))
+  }, [gmailConnected, settings.gmail, setSettings])
+
+  if (gmailConnected) {
+    return (
+      <div className="inbox connected">
+        <GmailInbox
+          compose={
+            <button
+              type="button"
+              className="mail-compose-icon"
+              onClick={() =>
+                open(`https://mail.google.com/mail/?authuser=${encodeURIComponent(google.email ?? '')}&view=cm&fs=1`)
+              }
+              title="Write an email (opens Gmail)"
+              aria-label="Write an email"
+            >
+              ✏️
+            </button>
+          }
+        />
+      </div>
+    )
+  }
 
   function search(event) {
     event.preventDefault()
