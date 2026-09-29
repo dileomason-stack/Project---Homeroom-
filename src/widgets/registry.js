@@ -2,6 +2,8 @@ import CalendarWidget from './CalendarWidget.jsx'
 import CanvasWidget from './CanvasWidget.jsx'
 import ClaudeWidget, { ChatGPTWidget } from './ClaudeWidget.jsx'
 import PreviewWidget from './PreviewWidget.jsx'
+import ShortcutWidget from './ShortcutWidget.jsx'
+import { shortcutFor } from './shortcutApps.js'
 import NewsWidget from './NewsWidget.jsx'
 import NotesWidget from './NotesWidget.jsx'
 import ScoresWidget from './ScoresWidget.jsx'
@@ -244,6 +246,20 @@ export const WIDGETS = {
     size: { w: 32, h: 70, minW: 16, minH: 40 },
     tab: { title: 'Arcade', address: 'Arcade', icon: ArcadeIcon },
   },
+  shortcut: {
+    title: 'App shortcut',
+    description: 'A tiny icon that opens an app, like Outlook or Canvas',
+    component: ShortcutWidget,
+    editLabel: 'Change app',
+    // Tiny on purpose: made for the leftover slivers of the screen.
+    size: { w: 5, h: 14, minW: 3, minH: 8 },
+    sidebarHeight: 60,
+    tab: { title: 'App shortcut', address: 'Shortcut', icon: GlobeIcon },
+    tabFor: (settings) => {
+      const app = shortcutFor(settings)
+      return app ? { title: app.title, address: new URL(app.url).hostname, href: app.url } : null
+    },
+  },
   preview: {
     title: 'Link preview',
     description: 'A preview of any website, one click to open it',
@@ -276,7 +292,7 @@ export const WIDGETS = {
 const USE = {
   live: ['todo', 'spotify', 'website', 'search', 'tool', 'notes', 'game', 'word', 'snake', 'g2048', 'typing', 'arcade'],
   preview: ['canvas', 'calendar', 'scores', 'news', 'sleeper', 'googlefile'],
-  jump: ['claude', 'chatgpt', 'inbox', 'links', 'preview'],
+  jump: ['claude', 'chatgpt', 'inbox', 'links', 'preview', 'shortcut'],
 }
 for (const [use, types] of Object.entries(USE)) for (const type of types) WIDGETS[type].use = use
 

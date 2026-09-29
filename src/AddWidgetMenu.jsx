@@ -6,7 +6,7 @@ import { WIDGETS } from './widgets/registry.js'
 // sections of tiles, several per row, so everything fits without scrolling.
 const GROUPS = [
   ['School', ['canvas', 'calendar', 'todo', 'notes', 'tool', 'googlefile']],
-  ['Apps & links', ['search', 'claude', 'chatgpt', 'inbox', 'spotify', 'links', 'website', 'preview']],
+  ['Apps & links', ['search', 'claude', 'chatgpt', 'inbox', 'spotify', 'links', 'shortcut', 'website', 'preview']],
   ['News & sports', ['news', 'scores', 'sleeper']],
   ['Games', ['arcade', 'word', 'g2048', 'snake', 'typing', 'game']],
 ]
