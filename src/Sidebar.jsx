@@ -48,12 +48,22 @@ export default function Sidebar({ widgets, collapsed, sizes, onSizesChange, onRe
 
   // Snap Spotify cards to a height its player fills: when the sidebar first
   // shows them, and after each resize.
+  // Snaps in the direction it was dragged: even a small drag down goes to
+  // the next size up, a small drag up to the next size down (on first show,
+  // to the nearest). Taller than the track-list size, it just grows.
+  const spotifySnapped = useRef({})
   function snapSpotify() {
     for (const widget of widgets) {
       if (widget.type !== 'spotify' || collapsed.has(widget.id)) continue
       const height = document.querySelector(`[data-sidebar-card="${widget.id}"]`)?.parentElement?.offsetHeight
-      if (!height || height >= SPOTIFY_HEIGHTS.at(-1)) continue
-      const target = SPOTIFY_HEIGHTS.reduce((best, h) => (Math.abs(h - height) < Math.abs(best - height) ? h : best))
+      if (!height) continue
+      const before = spotifySnapped.current[widget.id]
+      let target
+      if (height >= SPOTIFY_HEIGHTS.at(-1)) target = height
+      else if (before && height > before + 2) target = SPOTIFY_HEIGHTS.find((h) => h >= height) ?? height
+      else if (before && height < before - 2) target = [...SPOTIFY_HEIGHTS].reverse().find((h) => h <= height) ?? SPOTIFY_HEIGHTS[0]
+      else target = SPOTIFY_HEIGHTS.reduce((best, h) => (Math.abs(h - height) < Math.abs(best - height) ? h : best))
+      spotifySnapped.current[widget.id] = target
       if (Math.abs(target - height) > 2) panelRefs.current[widget.id]?.resize(target)
     }
   }

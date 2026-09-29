@@ -12,12 +12,19 @@ import { SPOTIFY_FILL_HEIGHTS } from './lib/spotifyPlayer.js'
 // A Spotify card's top strip (its grab bar), above the player.
 const SPOTIFY_BAR = 22
 
-// After resizing a Spotify card, snap it to the nearest height its player
-// fills (see SPOTIFY_FILL_HEIGHTS); taller than the track-list size is fine.
-function snappedSpotifyRows(rows) {
+// After resizing a Spotify card, snap it to a height its player fills (see
+// SPOTIFY_FILL_HEIGHTS), in the direction it was dragged: even a small drag
+// down goes to the next size up, a small drag up to the next size down.
+// Taller than the track-list size is fine.
+function snappedSpotifyRows(rows, rowsBefore) {
   const space = rows * ROW_HEIGHT - GAP - SPOTIFY_BAR
   if (space >= SPOTIFY_FILL_HEIGHTS.at(-1)) return rows
-  const target = SPOTIFY_FILL_HEIGHTS.reduce((best, h) => (Math.abs(h - space) < Math.abs(best - space) ? h : best))
+  const target =
+    rows > rowsBefore
+      ? (SPOTIFY_FILL_HEIGHTS.find((h) => h >= space) ?? space)
+      : rows < rowsBefore
+        ? ([...SPOTIFY_FILL_HEIGHTS].reverse().find((h) => h <= space) ?? SPOTIFY_FILL_HEIGHTS[0])
+        : SPOTIFY_FILL_HEIGHTS.reduce((best, h) => (Math.abs(h - space) < Math.abs(best - space) ? h : best))
   return Math.ceil((target + GAP + SPOTIFY_BAR) / ROW_HEIGHT)
 }
 
@@ -229,13 +236,15 @@ export default function Workspace({
             clearActive()
             onCardDrop?.(oldItem?.i, event)
           }}
-          onResizeStop={(finalLayout, _oldItem, item) => {
+          onResizeStop={(finalLayout, oldItem, item) => {
             clearActive()
             if (widgets.find((widget) => widget.id === item?.i)?.type !== 'spotify') return
-            const rows = snappedSpotifyRows(item.h)
+            const rows = snappedSpotifyRows(item.h, oldItem?.h ?? item.h)
             if (rows === item.h) return
             // After the grid library has saved its own result.
-            setTimeout(() => onGridChange(finalLayout.map(pickPosition).map((cell) => (cell.i === item.i ? { ...cell, h: rows } : cell))))
+            setTimeout(() =>
+              onGridChange(finalLayout.map(pickPosition).map((cell) => (cell.i === item.i ? { ...cell, h: rows } : cell))),
+            )
           }}
           onLayoutChange={handleLayoutChange}
         >
