@@ -98,9 +98,19 @@ function scheduleRenew() {
 }
 
 // A fresh access token from the server's stored sign-in (no pop-up).
+// Returns the new state, or null. `lastRenewFailure` says why: 'signed-out'
+// (the server has no sign-in), or 'offline' (it couldn't be reached, e.g. a
+// laptop just waking up; that keeps you signed in and tries again).
+let lastRenewFailure = null
 async function renew() {
   const response = await fetch('/api/google-auth', { credentials: 'same-origin' }).catch(() => null)
-  if (!response) return null
+  if (!response || (response.status >= 500 && response.status !== 503)) {
+    lastRenewFailure = 'offline'
+    clearTimeout(renewTimer)
+    renewTimer = setTimeout(() => renew().catch(() => {}), 30_000)
+    return null
+  }
+  lastRenewFailure = 'signed-out'
   if (response.status === 503) {
     serverKeepsSignIn = false
     return null
@@ -146,8 +156,12 @@ function signInError(error) {
 // called from a click, so the browser allows Google's pop-up.
 export async function connectGoogle(scopes) {
   const google = await loadScript()
-  // Always who you are (email), for "signed in as" and syncing your dashboard.
-  const wanted = [...new Set([...IDENTITY, ...(state?.scopes ?? []), ...scopes])]
+  // Ask for everything Homeroom uses every time (plus who you are, for
+  // "signed in as" and syncing). With the stay-signed-in server, each sign-in
+  // replaces the saved one, so asking for less would quietly drop access
+  // granted earlier (e.g. approving Tasks and losing Gmail the next day).
+  // People can still untick anything on Google's screen.
+  const wanted = [...new Set([...IDENTITY, ...Object.values(SCOPES), ...(state?.scopes ?? []), ...scopes])]
   const common = {
     client_id: GOOGLE_CLIENT_ID,
     scope: wanted.join(' '),
@@ -238,8 +252,19 @@ const ranOut = () => Object.assign(new Error('Your Google connection ran out. Re
 async function usable(token) {
   if (token && token.expiresAt > Date.now() + 30_000) return token
   if (serverKeepsSignIn && (await renew())) return state
+  // Couldn't reach the server (offline for a moment): stay signed in.
+  if (serverKeepsSignIn && lastRenewFailure === 'offline') throw new Error('You seem to be offline. Check your connection.')
   setState(null)
   throw ranOut()
+}
+
+// Back from sleep or back online: renew right away if the token ran out.
+if (typeof window !== 'undefined') {
+  const wake = () => {
+    if (serverKeepsSignIn && state && state.expiresAt < Date.now() + 5 * 60_000) renew().catch(() => {})
+  }
+  window.addEventListener('online', wake)
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && wake())
 }
 
 // A GET to one of Google's APIs with the current token.
