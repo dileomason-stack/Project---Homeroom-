@@ -476,9 +476,19 @@ function CalendarSetup({ canSignIn, onGoogle, onSave, onSample }) {
 }
 
 // Alex's made-up calendar. Adding, editing and deleting work like the real
-// one, but only until the page reloads.
-function SampleCalendar() {
-  const [events, setEvents] = useState(() => sampleEvents().map((event) => ({ ...event, editable: true })))
+// one; changes are kept with the card's settings as { edits: { id: event or
+// null (deleted) } } (Alex's example forgets them on reload).
+function SampleCalendar({ edits = {}, onEdits }) {
+  const base = useMemo(() => sampleEvents().map((event) => ({ ...event, editable: true })), [])
+  const events = useMemo(
+    () => [
+      ...base.map((event) => (event.id in edits ? edits[event.id] : event)).filter(Boolean),
+      ...Object.entries(edits)
+        .filter(([id, event]) => event && !base.some((sample) => sample.id === id))
+        .map(([, event]) => event),
+    ],
+    [base, edits],
+  )
   const [editing, setEditing] = useState(null)
 
   function fromBody({ kind, ...body }, id) {
@@ -526,16 +536,9 @@ function SampleCalendar() {
           onClose={() => setEditing(null)}
           onSave={async (body) => {
             const id = editing.event?.id ?? `new-${Date.now()}`
-            const next = fromBody(body, id)
-            setEvents((current) =>
-              editing.event ? current.map((event) => (event.id === id ? next : event)) : [...current, next],
-            )
+            onEdits({ ...edits, [id]: fromBody(body, id) })
           }}
-          onDelete={
-            editing.event
-              ? async () => setEvents((current) => current.filter((event) => event.id !== editing.event.id))
-              : undefined
-          }
+          onDelete={editing.event ? async () => onEdits({ ...edits, [editing.event.id]: null }) : undefined}
         />
       )}
     </>
@@ -575,7 +578,7 @@ export default function CalendarWidget({ id }) {
   if (settings.sample) {
     return (
       <div className="calendar-sample">
-        <SampleCalendar />
+        <SampleCalendar edits={settings.edits} onEdits={(next) => setSettings((current) => ({ ...current, edits: next }))} />
         {!store.example && (
           <button type="button" className="link-button" onClick={() => setSettings({})}>
             Connect my Google Calendar
