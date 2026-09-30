@@ -5,6 +5,7 @@ import { TEMPLATES } from './templates.js'
 // soon no matter when the demo happens. None of this is saved.
 
 export const EXAMPLE_PERSON = 'Alex Rivera'
+export const SAMPLE_CALENDAR_OWNER = 'alex.rivera@gmail.com'
 
 // Local 11:59 PM, `days` from today.
 function endOfDay(days, now = new Date()) {
@@ -45,7 +46,7 @@ export function sampleAssignments(now = new Date()) {
 // overlap a class, and Canvas due dates as all-day events.
 export function sampleEvents(now = new Date()) {
   const events = []
-  const add = (title, days, [h1, m1], [h2, m2], location = '') =>
+  const add = (title, days, [h1, m1], [h2, m2], location = '', colors = {}) =>
     events.push({
       id: `event-${events.length}`,
       title,
@@ -53,12 +54,13 @@ export function sampleEvents(now = new Date()) {
       allDay: false,
       start: atTime(days, h1, m1, now).toISOString(),
       end: atTime(days, h2, m2, now).toISOString(),
+      ...colors,
     })
-  const allDay = (title, days) => {
+  const allDay = (title, days, colors = {}) => {
     const date = atTime(days, 0, 0, now)
     const next = atTime(days + 1, 0, 0, now)
     const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    events.push({ id: `event-${events.length}`, title, location: '', allDay: true, start: key(date), end: key(next) })
+    events.push({ id: `event-${events.length}`, title, location: '', allDay: true, start: key(date), end: key(next), ...colors })
   }
 
   for (let days = -7; days <= 21; days++) {
@@ -80,6 +82,13 @@ export function sampleEvents(now = new Date()) {
     if (weekday === 4) add('Vibe coding club', days, [18, 0], [19, 0], 'Bldg 186')
     if (weekday === 5) add('Intramural soccer', days, [17, 0], [18, 30], 'Sports Complex')
   }
+  // Around right now, so today never looks empty whenever the demo happens:
+  // something on now, and something coming up after it.
+  const hour = now.getHours()
+  const pastel = (color) => ({ color, textColor: '#1f1f1f' })
+  add('Study session: CSC 202', 0, [hour, 0], [hour + 1, 30], 'Kennedy Library, 3rd floor', pastel('#b3dc6c'))
+  add('Dinner with roommates', 0, [hour + 2, 0], [hour + 3, 0], 'Mustang Village', pastel('#9fe1e7'))
+  allDay('Sam’s birthday 🎂', 0, pastel('#9fe1e7'))
   // Canvas due dates (matching the Canvas card).
   allDay('Lab 4: Linked Lists due', 0)
   allDay('Reading Quiz: Ch. 6 due', 1)
@@ -112,32 +121,34 @@ export function exampleSeed() {
       ],
       activeId: 'morning',
     },
-    // ☀️ Morning check: school stuff down the sidebar, AI helpers and search in
-    // the middle, a doc and fantasy football on the right.
+    // ☀️ Morning check, laid out like a real student's: music, Canvas and the
+    // calendar down the sidebar; class notes, search and a scratchpad on top;
+    // email, fantasy football and Claude below.
     'layout:morning': {
       theme: 'light',
       sidebarOpen: true,
       sidebarSize: 27,
       sidebar: [
-        { id: 'exm-canvas', type: 'canvas' },
         { id: 'exm-spotify', type: 'spotify' },
+        { id: 'exm-canvas', type: 'canvas' },
         { id: 'exm-calendar', type: 'calendar' },
-        { id: 'exm-mail', type: 'inbox' },
       ],
-      sidebarSizes: { 'exm-canvas': 24, 'exm-spotify': 13, 'exm-calendar': 51, 'exm-mail': 12, 'sidebar-space': 0 },
+      sidebarSizes: { 'exm-spotify': 11, 'exm-canvas': 30, 'exm-calendar': 59, 'sidebar-space': 0 },
       workspace: [
-        { id: 'exm-chatgpt', type: 'chatgpt' },
-        { id: 'exm-claude', type: 'claude' },
-        { id: 'exm-search', type: 'search' },
         { id: 'exm-doc', type: 'googlefile' },
+        { id: 'exm-search', type: 'search' },
+        { id: 'exm-notes', type: 'notes' },
+        { id: 'exm-mail', type: 'inbox' },
         { id: 'exm-sleeper', type: 'sleeper' },
+        { id: 'exm-claude', type: 'claude' },
       ],
       grid: [
-        { i: 'exm-chatgpt', x: 0, y: 0, w: 16, h: 32 },
-        { i: 'exm-claude', x: 0, y: 32, w: 16, h: 34 },
-        { i: 'exm-search', x: 0, y: 66, w: 16, h: 30 },
-        { i: 'exm-doc', x: 16, y: 0, w: 32, h: 60 },
-        { i: 'exm-sleeper', x: 16, y: 60, w: 32, h: 44 },
+        { i: 'exm-doc', x: 0, y: 0, w: 28, h: 60 },
+        { i: 'exm-search', x: 28, y: 0, w: 20, h: 28 },
+        { i: 'exm-notes', x: 28, y: 28, w: 20, h: 32 },
+        { i: 'exm-mail', x: 0, y: 60, w: 20, h: 57 },
+        { i: 'exm-sleeper', x: 20, y: 60, w: 14, h: 57 },
+        { i: 'exm-claude', x: 34, y: 60, w: 14, h: 57 },
       ],
       gridVersion: 2,
     },
@@ -146,6 +157,8 @@ export function exampleSeed() {
     'widget:exm-calendar': { sample: true },
     'widget:exm-mail': { sample: true, read: {} },
     'widget:exm-sleeper': { sample: true },
+    'widget:exm-notes':
+      'Today\n- Email Prof. Kim about the lab extension\n- Print ENGL essay draft\n- Pay Sam back for pizza ($12.50)\n- Batteries + snacks at Trader Joe’s\n\nThis week\n- Start Project 1 proposal with Maya',
     // Real shared class notes ("Anyone with the link" can view).
     'widget:exm-doc': { url: 'https://docs.google.com/document/d/1SvlWrpX5kxDIx_D9QJfH7iP6KKnoNao-eCAoJJH0-p8/edit' },
     'layout:fun': fun.layout,

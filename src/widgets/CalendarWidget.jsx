@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { sampleEvents } from '../example.js'
+import { SAMPLE_CALENDAR_OWNER, sampleEvents } from '../example.js'
 import { toCalendarEmbed } from '../lib/embeds.js'
 import { checkGoogleIcsUrl, looksLikeGoogleIcs } from '../lib/gcalFeed.js'
 import { formatTime } from '../lib/dates.js'
@@ -475,9 +475,71 @@ function CalendarSetup({ canSignIn, onGoogle, onSave, onSample }) {
   )
 }
 
+// Alex's made-up calendar. Adding, editing and deleting work like the real
+// one, but only until the page reloads.
 function SampleCalendar() {
-  const events = useMemo(() => sampleEvents(), [])
-  return <DayView events={events} />
+  const [events, setEvents] = useState(() => sampleEvents().map((event) => ({ ...event, editable: true })))
+  const [editing, setEditing] = useState(null)
+
+  function fromBody({ kind, ...body }, id) {
+    if (kind === 'task') {
+      const date = body.due.slice(0, 10)
+      const completed = body.status === 'completed'
+      return {
+        id,
+        kind: 'task',
+        title: body.title,
+        notes: body.notes,
+        completed,
+        allDay: true,
+        start: date,
+        end: dayAfter(date),
+        color: completed ? '#9aa0a6' : '#1a73e8',
+        textColor: '#fff',
+        editable: true,
+      }
+    }
+    const allDay = Boolean(body.start.date)
+    return {
+      id,
+      title: body.summary,
+      location: body.location,
+      allDay,
+      start: allDay ? body.start.date : body.start.dateTime,
+      end: allDay ? body.end.date : body.end.dateTime,
+      editable: true,
+    }
+  }
+
+  return (
+    <>
+      <DayView
+        events={events}
+        onNewEvent={(start) => setEditing({ start })}
+        onEventClick={(event) => setEditing({ event })}
+        footer={<p className="dayview-footer">{SAMPLE_CALENDAR_OWNER} · sample calendar</p>}
+      />
+      {editing && (
+        <EventEditor
+          event={editing.event ?? null}
+          start={editing.start}
+          onClose={() => setEditing(null)}
+          onSave={async (body) => {
+            const id = editing.event?.id ?? `new-${Date.now()}`
+            const next = fromBody(body, id)
+            setEvents((current) =>
+              editing.event ? current.map((event) => (event.id === id ? next : event)) : [...current, next],
+            )
+          }}
+          onDelete={
+            editing.event
+              ? async () => setEvents((current) => current.filter((event) => event.id !== editing.event.id))
+              : undefined
+          }
+        />
+      )}
+    </>
+  )
 }
 
 function FeedCalendar({ icsUrl, onReset }) {

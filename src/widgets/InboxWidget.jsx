@@ -18,42 +18,69 @@ const GMAIL = 'https://mail.google.com/mail/u/0/'
 const OUTLOOK = 'https://outlook.office.com/mail/'
 const open = openExternal
 
-
+// Alex's made-up inbox, shown like a signed-in Gmail inbox. `ago` is minutes
+// before now, so the times always look fresh.
+export const SAMPLE_ADDRESS = 'alex.rivera@gmail.com'
+const SAMPLE_UNREAD = 214
 const SAMPLE_EMAILS = [
   {
     id: 'e1',
     from: 'Prof. Kim',
     subject: 'CSC 202 Lab 4: extension until Friday',
-    snippet: 'Hi all, a few of you asked about the linked list lab…',
-    time: '9:12 AM',
+    snippet: 'Hi all, a few of you asked about the linked list lab. You can submit until Friday at 11:59pm…',
+    ago: 14,
   },
   {
     id: 'e2',
-    from: 'Canvas',
-    subject: 'Reading Quiz: Ch. 6 is due tomorrow',
-    snippet: 'PSY 201 · Due Sep 24 at 11:59pm',
-    time: '8:30 AM',
+    from: 'Venmo',
+    subject: 'Sam requested $12.50',
+    snippet: '🍕 Woodstock’s pizza night. Tap to pay or decline.',
+    ago: 52,
   },
   {
     id: 'e3',
-    from: 'Vibe Coding Club',
-    subject: 'Build Day #1 is Friday! 🎉',
-    snippet: 'Doors at 12:00, demos start 12:10 in Frost 181…',
-    time: 'Yesterday',
+    from: 'Canvas',
+    subject: 'Reading Quiz: Ch. 6 is due tomorrow',
+    snippet: 'PSY 201 · Due tomorrow at 11:59pm · 10 questions',
+    ago: 95,
   },
   {
     id: 'e4',
-    from: 'Mustang News',
-    subject: 'This week at Cal Poly',
-    snippet: 'Farmers market returns, new dining hours, and more',
-    time: 'Yesterday',
+    from: 'Mustang Village',
+    subject: 'Rent Reminder: October rent is due in 2 days',
+    snippet: 'Hello, this is a courtesy reminder that your October rent payment is due on the 1st…',
+    ago: 180,
   },
   {
     id: 'e5',
+    from: 'Vibe Coding Club',
+    subject: 'Build Day #2 is Friday! 🎉',
+    snippet: 'Doors at 12:00, demos start 12:10 in Frost 181. Bring a laptop and an idea…',
+    ago: 300,
+  },
+  {
+    id: 'e6',
     from: 'Maya (lab partner)',
     subject: 'Re: project proposal',
-    snippet: 'Sounds good, I can take the remove() tests if you…',
-    time: 'Mon',
+    snippet: 'Sounds good, I can take the remove() tests if you do the iterator…',
+    ago: 1500,
+    read: true,
+  },
+  {
+    id: 'e7',
+    from: 'Handshake',
+    subject: '3 new internships that match your profile',
+    snippet: 'Software Engineering Intern (Summer) · Apple · Cupertino, CA…',
+    ago: 1700,
+    read: true,
+  },
+  {
+    id: 'e8',
+    from: 'Mustang News',
+    subject: 'This week at Cal Poly',
+    snippet: 'Farmers market returns, new dining hours, and more',
+    ago: 2900,
+    read: true,
   },
 ]
 
@@ -278,7 +305,8 @@ export default function InboxWidget({ id }) {
   const microsoft = useMicrosoft()
   const outlookConnected = showingGmail && Boolean(microsoft)
   const read = settings.read ?? {}
-  const unread = SAMPLE_EMAILS.filter((email) => !read[email.id]).length
+  const isRead = (email) => email.read || read[email.id]
+  const unread = SAMPLE_UNREAD - SAMPLE_EMAILS.filter((email) => !email.read && read[email.id]).length
 
   // With your Gmail connected, the card is just your inbox and a small
   // compose button (the app tiles and search come back if you sign out).
@@ -288,6 +316,44 @@ export default function InboxWidget({ id }) {
       setSettings((current) => ({ ...current, gmail: gmailConnected, outlook: outlookConnected }))
     }
   }, [gmailConnected, outlookConnected, settings.gmail, settings.outlook, setSettings])
+
+  // Alex's example: a made-up inbox that looks just like a signed-in one.
+  if (settings.sample) {
+    return (
+      <div className="inbox connected">
+        <div className="inbox-head">
+          <p className="inbox-count">
+            {unread} unread <span>· {SAMPLE_ADDRESS}</span>
+          </p>
+          <button
+            type="button"
+            className="mail-compose-icon"
+            onClick={() => open('https://mail.google.com/mail/?view=cm&fs=1')}
+            title="Write an email (opens Gmail)"
+            aria-label="Write an email"
+          >
+            ✏️
+          </button>
+        </div>
+        <ul className="inbox-list">
+          {SAMPLE_EMAILS.map((email) => (
+            <li key={email.id}>
+              <button
+                type="button"
+                className={isRead(email) ? 'read' : undefined}
+                onClick={() => setSettings((current) => ({ ...current, read: { ...current.read, [email.id]: true } }))}
+              >
+                <span className="inbox-from">{email.from}</span>
+                <span className="inbox-time">{shortTime(new Date(Date.now() - email.ago * 60000))}</span>
+                <span className="inbox-subject">{email.subject}</span>
+                <span className="inbox-snippet">{email.snippet}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
 
   if (gmailConnected || outlookConnected) {
     // Both connected: a small Gmail | Outlook switch picks which inbox shows.
@@ -432,29 +498,7 @@ export default function InboxWidget({ id }) {
         />
       </form>
 
-      {settings.sample ? (
-        <>
-          <p className="inbox-count">
-            {unread ? `${unread} unread` : 'All caught up'} <span>· sample inbox (made-up emails)</span>
-          </p>
-          <ul className="inbox-list">
-            {SAMPLE_EMAILS.map((email) => (
-              <li key={email.id}>
-                <button
-                  type="button"
-                  className={read[email.id] ? 'read' : undefined}
-                  onClick={() => setSettings((current) => ({ ...current, read: { ...current.read, [email.id]: true } }))}
-                >
-                  <span className="inbox-from">{email.from}</span>
-                  <span className="inbox-time">{email.time}</span>
-                  <span className="inbox-subject">{email.subject}</span>
-                  <span className="inbox-snippet">{email.snippet}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : showingGmail ? (
+      {showingGmail ? (
         <>
           <GmailInbox />
           {outlookAvailable() && <MicrosoftSignIn />}

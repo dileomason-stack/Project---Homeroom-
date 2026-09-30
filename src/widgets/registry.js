@@ -282,7 +282,11 @@ export const WIDGETS = {
     tab: { title: 'Website', address: 'Website', icon: GlobeIcon },
     tabFor: (settings) =>
       settings?.url
-        ? { title: settings.title ?? 'Website', address: new URL(settings.openUrl ?? settings.url).hostname, href: settings.openUrl ?? settings.url }
+        ? {
+            title: settings.title ?? 'Website',
+            address: new URL(settings.openUrl ?? settings.url).hostname,
+            href: settings.openUrl ?? settings.url,
+          }
         : null,
   },
 }
@@ -297,11 +301,11 @@ const USE = {
 for (const [use, types] of Object.entries(USE)) for (const type of types) WIDGETS[type].use = use
 
 // Some cards work differently depending on how they're set up: a calendar
-// you signed in to (add and edit events) works right in the card; one shown
-// by email, a feed or a sample is a preview.
-WIDGETS.calendar.useFor = (settings) => (settings?.google ? 'live' : 'preview')
-// Mail showing your real inbox is a preview; otherwise it's shortcuts.
-WIDGETS.inbox.useFor = (settings) => (settings?.gmail || settings?.outlook ? 'preview' : 'jump')
+// you signed in to (add and edit events), or Alex's sample, works right in the
+// card; one shown by email or a feed is a preview.
+WIDGETS.calendar.useFor = (settings) => (settings?.google || settings?.sample ? 'live' : 'preview')
+// Mail showing an inbox (yours, or Alex’s sample) is a preview; otherwise it’s shortcuts.
+WIDGETS.inbox.useFor = (settings) => (settings?.gmail || settings?.outlook || settings?.sample ? 'preview' : 'jump')
 
 // A card's tab info: the type's, adjusted by tabFor for that card's settings.
 export function tabOf(widget, settings) {
