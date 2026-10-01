@@ -4,7 +4,7 @@ A full-screen, customizable dashboard for students, like phone home-screen widge
 website. Users add widgets, drag them around, resize them, and the layout is still there the
 next time they open the URL. No accounts, no login.
 
-This is my entry for Build Day #1 (see README.md in this folder for the rules).
+This is my entry for Build Day #1 (see BUILD_DAY.md in this folder for the rules).
 **Deadline: Thursday, September 24, 11:59 PM PDT. It must be deployed on Vercel at a public URL.**
 
 ## About me (read this, agent)
